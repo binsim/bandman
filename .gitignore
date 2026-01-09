@@ -1,0 +1,4 @@
+# Ignore all files in the .svelte-kit directory
+.svelte-kit
+
+node_modules
