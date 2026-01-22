@@ -4,3 +4,9 @@
 node_modules
 
 .DS_Store
+
+/generated/prisma
+
+/generated/prisma
+
+.env
