@@ -7,6 +7,4 @@ node_modules
 
 /generated/prisma
 
-/generated/prisma
-
 .env
