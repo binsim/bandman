@@ -3,6 +3,8 @@ import { fail } from '@sveltejs/kit';
 import type { Prisma } from '../../../generated/prisma/client.js';
 
 import type { Actions, PageServerLoad } from './$types.js';
+import { baseLocale } from '$lib/i18n/i18n-util.js';
+import LL from '$lib/i18n/i18n-svelte.js';
 
 export const load: PageServerLoad = async () => {
 	return {
