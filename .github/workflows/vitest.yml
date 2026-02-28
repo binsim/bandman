@@ -8,6 +8,9 @@ on:
 
 jobs:
     build:
+        # Run this job if the event is not a pull request OR the pull request is not a draft.
+        # This prevents the job from running for draft PRs.
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft != true }}
         runs-on: ubuntu-latest
 
         strategy:
