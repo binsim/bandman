@@ -30,6 +30,54 @@ type RootTranslation = {
 	 * L​a​b​e​l
 	 */
 	Label: string
+	/**
+	 * L​o​g​o​u​t
+	 */
+	Logout: string
+	/**
+	 * S​i​g​n​ ​I​n
+	 */
+	SignIn: string
+	/**
+	 * R​e​g​i​s​t​e​r
+	 */
+	Register: string
+	/**
+	 * E​n​t​e​r​ ​c​r​e​d​e​n​t​i​a​l​s​ ​t​o​ ​a​c​c​e​s​s​ ​y​o​u​r​ ​a​c​c​o​u​n​t​.
+	 */
+	EnterCredentialsForAccountAccess: string
+	/**
+	 * U​s​e​r​n​a​m​e
+	 */
+	Username: string
+	/**
+	 * P​a​s​s​w​o​r​d
+	 */
+	Password: string
+	/**
+	 * C​o​n​f​i​r​m​ ​P​a​s​s​w​o​r​d
+	 */
+	ConfirmPassword: string
+	/**
+	 * P​a​s​s​w​o​r​d​s​ ​d​o​ ​n​o​t​ ​m​a​t​c​h​.
+	 */
+	PasswordMismatch: string
+	/**
+	 * R​e​m​e​m​b​e​r​ ​m​e
+	 */
+	RememberMe: string
+	/**
+	 * F​o​r​g​o​t​ ​p​a​s​s​w​o​r​d​?
+	 */
+	ForgotPassword: string
+	/**
+	 * D​o​n​'​t​ ​h​a​v​e​ ​a​n​ ​a​c​c​o​u​n​t​?
+	 */
+	DontHaveAnAccount: string
+	/**
+	 * A​l​r​e​a​d​y​ ​h​a​v​e​ ​a​n​ ​a​c​c​o​u​n​t​?
+	 */
+	AlreadyHaveAnAccount: string
 }
 
 export type TranslationFunctions = {
@@ -49,6 +97,54 @@ export type TranslationFunctions = {
 	 * Label
 	 */
 	Label: () => LocalizedString
+	/**
+	 * Logout
+	 */
+	Logout: () => LocalizedString
+	/**
+	 * Sign In
+	 */
+	SignIn: () => LocalizedString
+	/**
+	 * Register
+	 */
+	Register: () => LocalizedString
+	/**
+	 * Enter credentials to access your account.
+	 */
+	EnterCredentialsForAccountAccess: () => LocalizedString
+	/**
+	 * Username
+	 */
+	Username: () => LocalizedString
+	/**
+	 * Password
+	 */
+	Password: () => LocalizedString
+	/**
+	 * Confirm Password
+	 */
+	ConfirmPassword: () => LocalizedString
+	/**
+	 * Passwords do not match.
+	 */
+	PasswordMismatch: () => LocalizedString
+	/**
+	 * Remember me
+	 */
+	RememberMe: () => LocalizedString
+	/**
+	 * Forgot password?
+	 */
+	ForgotPassword: () => LocalizedString
+	/**
+	 * Don't have an account?
+	 */
+	DontHaveAnAccount: () => LocalizedString
+	/**
+	 * Already have an account?
+	 */
+	AlreadyHaveAnAccount: () => LocalizedString
 }
 
 export type Formatters = {}

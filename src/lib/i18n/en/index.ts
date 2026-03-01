@@ -6,6 +6,18 @@ const en = {
 	Artist: 'Artist',
 	Duration: 'Duration',
 	Label: 'Label',
+	Logout: 'Logout',
+	SignIn: 'Sign In',
+	Register: 'Register',
+	EnterCredentialsForAccountAccess: 'Enter credentials to access your account.',
+	Username: 'Username',
+	Password: 'Password',
+	ConfirmPassword: 'Confirm Password',
+	PasswordMismatch: 'Passwords do not match.',
+	RememberMe: 'Remember me',
+	ForgotPassword: 'Forgot password?',
+	DontHaveAnAccount: "Don't have an account?",
+	AlreadyHaveAnAccount: 'Already have an account?',
 } satisfies BaseTranslation;
 
 export default en;

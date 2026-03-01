@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import LL from '$lib/i18n/i18n-svelte';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
@@ -19,8 +20,8 @@
 	<div class="login-container">
 		<div class="login-card">
 			<div class="login-header">
-				<h2>Register</h2>
-				<p>Enter credentials to create your account</p>
+				<h2>{$LL.Register}</h2>
+				<p>{$LL.EnterCredentialsToCreateAccount}</p>
 			</div>
 
 			<form class="login-form" method="POST" use:enhance>
@@ -34,7 +35,7 @@
 							value={form?.username ?? ''}
 							autocomplete="username"
 						/>
-						<label for="username">Username</label>
+						<label for="username">{LL.Username}</label>
 					</div>
 				</div>
 
@@ -53,7 +54,7 @@
 							autocomplete="current-password"
 							bind:value={password}
 						/>
-						<label for="password">Password</label>
+						<label for="password">{LL.Password}</label>
 						<button
 							type="button"
 							class="password-toggle"
@@ -87,7 +88,7 @@
 							autocomplete="current-password"
 							bind:value={repassword}
 						/>
-						<label for="repassword">Confirm Password</label>
+						<label for="repassword">{LL.ConfirmPassword}</label>
 						<button
 							type="button"
 							class="password-toggle"
@@ -104,20 +105,20 @@
 					{#if (form?.errorMessage ?? '' !== '') || password !== repassword}
 						<span class="error-message" id="passwordError"
 							>{passwordMatchingError
-								? 'Passwords do not match'
+								? LL.PasswordMismatch
 								: form?.errorMessage}</span
 						>
 					{/if}
 				</div>
 
 				<button type="submit" class="login-btn">
-					<span class="btn-text">Register</span>
+					<span class="btn-text">{LL.Register}</span>
 					<span class="btn-loader"></span>
 				</button>
 			</form>
 
 			<div class="signup-link">
-				<p>Already have an account? <a href="/login">Sign In</a></p>
+				<p>{LL.AlreadyHaveAccount} <a href="/login">{LL.SignIn}</a></p>
 			</div>
 		</div>
 	</div>
