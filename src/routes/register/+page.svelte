@@ -3,6 +3,9 @@
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
+
+	let showPassword = $state(false);
+	let showRepassword = $state(false);
 </script>
 
 <div class="container">
@@ -31,7 +34,7 @@
 				<div class="form-group">
 					<div class="input-wrapper password-wrapper">
 						<input
-							type="password"
+							type={showPassword ? 'text' : 'password'}
 							id="password"
 							name="password"
 							required
@@ -43,8 +46,12 @@
 							class="password-toggle"
 							id="passwordToggle"
 							aria-label="Toggle password visibility"
+							onclick={() => (showPassword = !showPassword)}
 						>
-							<span class="eye-icon"></span>
+							<span
+								class={'eye-icon' + (showPassword ? ' show-password' : '')}
+								aria-hidden="true"
+							></span>
 						</button>
 					</div>
 					{#if form?.errorMessage ?? '' !== ''}
@@ -55,7 +62,7 @@
 				<div class="form-group">
 					<div class="input-wrapper password-wrapper">
 						<input
-							type="password"
+							type={showRepassword ? 'text' : 'password'}
 							id="repassword"
 							name="repassword"
 							required
@@ -67,8 +74,12 @@
 							class="password-toggle"
 							id="passwordToggle"
 							aria-label="Toggle password visibility"
+							onclick={() => (showRepassword = !showRepassword)}
 						>
-							<span class="eye-icon"></span>
+							<span
+								class={'eye-icon' + (showRepassword ? ' show-password' : '')}
+								aria-hidden="true"
+							></span>
 						</button>
 					</div>
 					{#if form?.errorMessage ?? '' !== ''}
