@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
 	import type { PageProps } from './$types';
+	import LL from '$lib/i18n/i18n-svelte';
 
 	let { data, form }: PageProps = $props();
 
@@ -11,8 +12,8 @@
 	<div class="login-container">
 		<div class="login-card">
 			<div class="login-header">
-				<h2>Sign In</h2>
-				<p>Enter your credentials to access your account</p>
+				<h2>{$LL.SignIn}</h2>
+				<p>{$LL.EnterCredentialsForAccountAccess}</p>
 			</div>
 
 			<form class="login-form" method="POST" use:enhance>
@@ -26,7 +27,7 @@
 							value={form?.username ?? ''}
 							autocomplete="username"
 						/>
-						<label for="username">Username</label>
+						<label for="username">{$LL.Username}</label>
 					</div>
 				</div>
 
@@ -39,7 +40,7 @@
 							required
 							autocomplete="current-password"
 						/>
-						<label for="password">Password</label>
+						<label for="password">{$LL.Password}</label>
 						<button
 							type="button"
 							class="password-toggle"
@@ -63,20 +64,20 @@
 						<input type="checkbox" id="remember" name="remember" />
 						<span class="checkbox-label">
 							<span class="checkmark"></span>
-							Remember me
+							{$LL.RememberMe}
 						</span>
 					</label>
-					<a href="#" class="forgot-password">Forgot password?</a>
+					<a href="#" class="forgot-password">{$LL.ForgotPassword}</a>
 				</div>
 
 				<button type="submit" class="login-btn">
-					<span class="btn-text">Sign In</span>
+					<span class="btn-text">{$LL.SignIn}</span>
 					<span class="btn-loader"></span>
 				</button>
 			</form>
 
 			<div class="signup-link">
-				<p>Don't have an account? <a href="/register">Create one</a></p>
+				<p>{$LL.DontHaveAnAccount}<a href="/register">{$LL.CreateAccount}</a></p>
 			</div>
 		</div>
 	</div>

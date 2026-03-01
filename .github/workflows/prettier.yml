@@ -10,6 +10,9 @@ jobs:
     prettier:
         name: Prettier Check
         runs-on: ubuntu-latest
+        # Skip this job when the event is a pull request AND the PR is a draft.
+        # For pushes (or other events) the job will still run.
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v2
