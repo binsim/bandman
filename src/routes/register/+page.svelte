@@ -6,6 +6,13 @@
 
 	let showPassword = $state(false);
 	let showRepassword = $state(false);
+
+	let password = $state('');
+	let repassword = $state('');
+
+	let passwordMatchingError = $derived(
+		password !== repassword && password !== '' && repassword !== '',
+	);
 </script>
 
 <div class="container">
@@ -17,7 +24,7 @@
 			</div>
 
 			<form class="login-form" method="POST" use:enhance>
-				<div class="form-group">
+				<div class={'form-group' + ((form?.errorMessage ?? '' !== '') ? ' error' : '')}>
 					<div class="input-wrapper">
 						<input
 							type="text"
@@ -31,7 +38,12 @@
 					</div>
 				</div>
 
-				<div class="form-group">
+				<div
+					class={'form-group' +
+						(passwordMatchingError || (form?.errorMessage ?? '' !== '')
+							? ' error'
+							: '')}
+				>
 					<div class="input-wrapper password-wrapper">
 						<input
 							type={showPassword ? 'text' : 'password'}
@@ -39,6 +51,7 @@
 							name="password"
 							required
 							autocomplete="current-password"
+							bind:value={password}
 						/>
 						<label for="password">Password</label>
 						<button
@@ -59,7 +72,12 @@
 					{/if}
 				</div>
 
-				<div class="form-group">
+				<div
+					class={'form-group' +
+						(passwordMatchingError || (form?.errorMessage ?? '' !== '')
+							? ' error'
+							: '')}
+				>
 					<div class="input-wrapper password-wrapper">
 						<input
 							type={showRepassword ? 'text' : 'password'}
@@ -67,6 +85,7 @@
 							name="repassword"
 							required
 							autocomplete="current-password"
+							bind:value={repassword}
 						/>
 						<label for="repassword">Confirm Password</label>
 						<button
@@ -82,8 +101,12 @@
 							></span>
 						</button>
 					</div>
-					{#if form?.errorMessage ?? '' !== ''}
-						<span class="error-message" id="passwordError">{form?.errorMessage}</span>
+					{#if (form?.errorMessage ?? '' !== '') || password !== repassword}
+						<span class="error-message" id="passwordError"
+							>{passwordMatchingError
+								? 'Passwords do not match'
+								: form?.errorMessage}</span
+						>
 					{/if}
 				</div>
 
@@ -180,14 +203,12 @@
 	}
 
 	.input-wrapper input:focus,
-	.input-wrapper input:valid,
-	.input-wrapper input.has-value {
+	.input-wrapper input:valid {
 		border-color: #6366f1;
 	}
 
 	.input-wrapper input:focus + label,
-	.input-wrapper input:valid + label,
-	.input-wrapper input.has-value + label {
+	.input-wrapper input:valid + label {
 		transform: translateY(-8px) scale(0.875);
 		color: #6366f1;
 		font-weight: 500;
@@ -259,17 +280,6 @@
 		gap: 12px;
 	}
 
-	.remember-wrapper {
-		display: flex;
-		align-items: center;
-		gap: 8px;
-		cursor: pointer;
-	}
-
-	.remember-wrapper input[type='checkbox'] {
-		display: none;
-	}
-
 	.checkbox-label {
 		color: #64748b;
 		font-size: 0.875rem;
@@ -291,18 +301,6 @@
 		transition: all 0.2s ease;
 		flex-shrink: 0;
 		background: white;
-	}
-
-	.remember-wrapper input[type='checkbox']:checked ~ .checkbox-label .checkmark {
-		background: #6366f1;
-		border-color: #6366f1;
-	}
-
-	.remember-wrapper input[type='checkbox']:checked ~ .checkbox-label .checkmark::after {
-		content: '✓';
-		color: white;
-		font-size: 10px;
-		font-weight: bold;
 	}
 
 	.forgot-password {

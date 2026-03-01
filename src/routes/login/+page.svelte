@@ -16,7 +16,7 @@
 			</div>
 
 			<form class="login-form" method="POST" use:enhance>
-				<div class="form-group">
+				<div class={'form-group' + ((form?.errorMessage ?? '' !== '') ? ' error' : '')}>
 					<div class="input-wrapper">
 						<input
 							type="text"
@@ -30,7 +30,7 @@
 					</div>
 				</div>
 
-				<div class="form-group">
+				<div class={'form-group' + ((form?.errorMessage ?? '' !== '') ? ' error' : '')}>
 					<div class="input-wrapper password-wrapper">
 						<input
 							type={showPassword ? 'text' : 'password'}
@@ -162,14 +162,12 @@
 	}
 
 	.input-wrapper input:focus,
-	.input-wrapper input:valid,
-	.input-wrapper input.has-value {
+	.input-wrapper input:valid {
 		border-color: #6366f1;
 	}
 
 	.input-wrapper input:focus + label,
-	.input-wrapper input:valid + label,
-	.input-wrapper input.has-value + label {
+	.input-wrapper input:valid + label {
 		transform: translateY(-8px) scale(0.875);
 		color: #6366f1;
 		font-weight: 500;
