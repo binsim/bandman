@@ -12,7 +12,7 @@ jobs:
         runs-on: ubuntu-lates
         # Run this job if the event is not a pull request OR the pull request is not a draft.
         # This prevents the job from running for draft PRs.
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft != true }}t
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft != true }}
         steps:
             - name: Checkout Repository
               uses: actions/checkout@v2
