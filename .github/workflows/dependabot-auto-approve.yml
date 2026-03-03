@@ -1,0 +1,94 @@
+name: 'Dependabot Auto-approve after CI'
+
+on:
+    workflow_run:
+        # List the workflows that run CI and which, when they complete successfully,
+        # should trigger this auto-approve workflow.
+        # These names should match the "name:" values of the CI workflows in .github/workflows.
+        workflows:
+            - Continuous Integration
+            - Runs Vitest
+        types:
+            - completed
+
+permissions:
+    # Needed to read checks and approve pull requests
+    checks: read
+    contents: read
+    pull-requests: write
+
+concurrency:
+    group: dependabot-auto-approve-${{ github.event.workflow_run.head_branch }}
+    cancel-in-progress: true
+
+jobs:
+    auto-approve:
+        name: Auto-approve Dependabot PRs
+        # Only run when the completed workflow succeeded
+        if: ${{ github.event.workflow_run.conclusion == 'success' }}
+        runs-on: ubuntu-latest
+        steps:
+            - name: Auto-approve Dependabot pull requests
+              uses: actions/github-script@v6
+              with:
+                  # Use the provided token with pull-request write permissions
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+                  script: |
+                      const run = github.context.payload.workflow_run;
+                      const prs = run.pull_requests || [];
+
+                      if (prs.length === 0) {
+                        core.info("No pull requests associated with this workflow run. Nothing to approve.");
+                        return;
+                      }
+
+                      for (const prRef of prs) {
+                        const pull_number = prRef.number;
+                        const owner = prRef.base.repo.owner.login;
+                        const repo = prRef.base.repo.name;
+
+                        core.info(`Checking PR #${pull_number} in ${owner}/${repo}`);
+
+                        // Fetch full PR data to check author and current reviews
+                        const { data: pr } = await github.rest.pulls.get({
+                          owner,
+                          repo,
+                          pull_number
+                        });
+
+                        const author = pr.user && pr.user.login ? pr.user.login.toLowerCase() : '';
+                        core.info(`PR author: ${author}`);
+
+                        // Only auto-approve Dependabot authored PRs
+                        if (!author.includes('dependabot')) {
+                          core.info('PR author is not Dependabot. Skipping.');
+                          continue;
+                        }
+
+                        // Make sure no approval by the GITHUB_ACTOR (this workflow) already exists
+                        const { data: reviews } = await github.rest.pulls.listReviews({
+                          owner,
+                          repo,
+                          pull_number
+                        });
+
+                        const alreadyApprovedByBot = reviews.some(r => {
+                          return r.user && r.user.login === github.context.actor && r.state === 'APPROVED';
+                        });
+
+                        if (alreadyApprovedByBot) {
+                          core.info('This actor already approved the PR previously. Skipping.');
+                          continue;
+                        }
+
+                        // Post an approval review
+                        await github.rest.pulls.createReview({
+                          owner,
+                          repo,
+                          pull_number,
+                          event: 'APPROVE',
+                          body: 'Auto-approving Dependabot PR because CI workflows have completed successfully.'
+                        });
+
+                        core.info(`Approved PR #${pull_number}`);
+                      }
