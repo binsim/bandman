@@ -1,11 +1,17 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
-
+# Dependabot configuration - combine all npm updates into a single PR per run
 version: 2
 updates:
-  - package-ecosystem: "npm" # See documentation for possible values
-    directory: "/" # Location of package manifests
-    schedule:
-      interval: "weekly"
+    - package-ecosystem: 'npm'
+      directory: '/'
+      schedule:
+          interval: 'weekly'
+      # Maximum number of open Dependabot PRs for this ecosystem
+      open-pull-requests-limit: 10
+      # Consistent commit message / PR title prefix
+      commit-message:
+          prefix: 'chore(deps)'
+      # Group rules: match all dependencies so Dependabot combines them into one PR
+      groups:
+          combined-dependencies:
+              patterns:
+                  - '*'
