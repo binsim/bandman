@@ -6,7 +6,7 @@
 		showErrorMessage?: boolean;
 		type: 'text' | 'password';
 		name: string;
-		value?: string;
+		value?: any;
 		autocomplete?: FullAutoFill;
 		label: string;
 		required?: boolean | null | undefined;
@@ -57,12 +57,6 @@
 {/if}
 
 <style lang="scss">
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
-
 	.input-wrapper input {
 		background: white;
 		border: 2px solid #e2e8f0;

@@ -16,74 +16,66 @@
 	);
 </script>
 
-<div class="container">
-	<div class="login-container">
-		<div class="login-card">
-			<div class="login-header">
-				<h2>Register</h2>
-				<p>Enter credentials to create your account</p>
+<div class="login-container">
+	<div class="login-card">
+		<div class="login-header">
+			<h2>Register</h2>
+			<p>Enter credentials to create your account</p>
+		</div>
+
+		<form class="login-form" method="POST" use:enhance>
+			<div class="form-group">
+				<Input
+					type="text"
+					name="username"
+					required
+					value={form?.username ?? ''}
+					autocomplete="username"
+					label="Username"
+					showErrorMessage={false}
+					errorMessage={form?.errorMessage}
+				/>
 			</div>
 
-			<form class="login-form" method="POST" use:enhance>
-				<div class="form-group">
-					<Input
-						type="text"
-						name="username"
-						required
-						value={form?.username ?? ''}
-						autocomplete="username"
-						label="Username"
-						showErrorMessage={false}
-						errorMessage={form?.errorMessage}
-					/>
-				</div>
-
-				<div class="form-group">
-					<Input
-						type="password"
-						name="password"
-						label="Password"
-						required
-						autocomplete="current-password"
-						bind:value={password}
-						showErrorMessage={false}
-						errorMessage={passwordMatchingError !== ''
-							? passwordMatchingError
-							: form?.errorMessage}
-					/>
-				</div>
-
-				<div class="form-group">
-					<Input
-						type="password"
-						name="repassword"
-						label="Confirm Password"
-						required
-						autocomplete="current-password"
-						bind:value={repassword}
-						errorMessage={passwordMatchingError !== ''
-							? passwordMatchingError
-							: form?.errorMessage}
-					/>
-				</div>
-
-				<Button text="Register" />
-			</form>
-
-			<div class="signup-link">
-				<p>Already have an account? <a href="/login">Sign In</a></p>
+			<div class="form-group">
+				<Input
+					type="password"
+					name="password"
+					label="Password"
+					required
+					autocomplete="current-password"
+					bind:value={password}
+					showErrorMessage={false}
+					errorMessage={passwordMatchingError !== ''
+						? passwordMatchingError
+						: form?.errorMessage}
+				/>
 			</div>
+
+			<div class="form-group">
+				<Input
+					type="password"
+					name="repassword"
+					label="Confirm Password"
+					required
+					autocomplete="current-password"
+					bind:value={repassword}
+					errorMessage={passwordMatchingError !== ''
+						? passwordMatchingError
+						: form?.errorMessage}
+				/>
+			</div>
+
+			<Button text="Register" type="submit" />
+		</form>
+
+		<div class="signup-link">
+			<p>Already have an account? <a href="/login">Sign In</a></p>
 		</div>
 	</div>
 </div>
 
 <style lang="scss">
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
-
 	.login-container {
 		width: 100%;
 		max-width: 400px;

@@ -2,71 +2,64 @@
 	import { enhance } from '$app/forms';
 	import Button from '$lib/components/Button.svelte';
 	import Input from '$lib/components/Input.svelte';
+	import { delay } from '@vitest/utils/timers';
 	import type { PageProps } from './$types';
 
 	let { data, form }: PageProps = $props();
 </script>
 
-<div class="container">
-	<div class="login-container">
-		<div class="login-card">
-			<div class="login-header">
-				<h2>Sign In</h2>
-				<p>Enter your credentials to access your account</p>
+<div class="login-container">
+	<div class="login-card">
+		<div class="login-header">
+			<h2>Sign In</h2>
+			<p>Enter your credentials to access your account</p>
+		</div>
+
+		<form class="login-form" method="POST" use:enhance>
+			<div class="form-group">
+				<Input
+					type="text"
+					name="username"
+					label="Username"
+					required
+					value={form?.username ?? ''}
+					autocomplete="username"
+					showErrorMessage={false}
+					errorMessage={form?.errorMessage}
+				/>
+			</div>
+			<div class="form-group">
+				<Input
+					type="password"
+					name="password"
+					label="Password"
+					required
+					autocomplete="current-password"
+					errorMessage={form?.errorMessage}
+				/>
 			</div>
 
-			<form class="login-form" method="POST" use:enhance>
-				<div class="form-group">
-					<Input
-						type="text"
-						name="username"
-						label="Username"
-						required
-						value={form?.username ?? ''}
-						autocomplete="username"
-						showErrorMessage={false}
-						errorMessage={form?.errorMessage}
-					/>
-				</div>
-				<div class="form-group">
-					<Input
-						type="password"
-						name="password"
-						label="Password"
-						required
-						autocomplete="current-password"
-						errorMessage={form?.errorMessage}
-					/>
-				</div>
-
-				<div class="form-options">
-					<label class="remember-wrapper">
-						<input type="checkbox" id="remember" name="remember" />
-						<span class="checkbox-label">
-							<span class="checkmark"></span>
-							Remember me
-						</span>
-					</label>
-					<a href="#" class="forgot-password">Forgot password?</a>
-				</div>
-
-				<Button text="Sign In" />
-			</form>
-
-			<div class="signup-link">
-				<p>Don't have an account? <a href="/register">Create one</a></p>
+			<div class="form-options">
+				<label class="remember-wrapper">
+					<input type="checkbox" id="remember" name="remember" />
+					<span class="checkbox-label">
+						<span class="checkmark"></span>
+						Remember me
+					</span>
+				</label>
+				<a href="#" class="forgot-password">Forgot password?</a>
 			</div>
+
+			<Button text="Sign In" type="submit" />
+		</form>
+
+		<div class="signup-link">
+			<p>Don't have an account? <a href="/register">Create one</a></p>
 		</div>
 	</div>
 </div>
 
 <style lang="scss">
-	* {
-		margin: 0;
-		padding: 0;
-		box-sizing: border-box;
-	}
-
 	.login-container {
 		width: 100%;
 		max-width: 400px;
