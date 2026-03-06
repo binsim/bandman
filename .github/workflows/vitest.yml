@@ -1,33 +1,46 @@
 name: Runs Vitest
 
+# Run on pushes to main and on PR events including when a draft PR
+# is marked "ready for review" so the workflow will start automatically then.
 on:
     push:
         branches: ['main']
     pull_request:
         branches: ['main']
+        # include the ready_for_review type so workflows start when a draft is
+        # converted to a regular PR
+        types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
     build:
-        # Run this job if the event is not a pull request OR the pull request is not a draft.
-        # This prevents the job from running for draft PRs.
+        # Only run for non-draft pull requests (or non-PR events like push).
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft != true }}
         runs-on: ubuntu-latest
 
         strategy:
             matrix:
                 node-version: [22.x]
-                # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
 
         steps:
             - uses: actions/checkout@v4
+
             - name: Use Node.js ${{ matrix.node-version }}
               uses: actions/setup-node@v4
               with:
                   node-version: ${{ matrix.node-version }}
                   cache: 'npm'
-            - run: npm ci
+
+            - name: Install dependencies
+              run: npm ci
+
             - name: Install Playwright
               run: npx playwright install --with-deps
-            - run: cp ./.env.example ./.env
-            - run: npm run build --if-present
-            - run: npm test
+
+            - name: Copy example env
+              run: cp ./.env.example ./.env
+
+            - name: Build (if present)
+              run: npm run build --if-present
+
+            - name: Run tests
+              run: npm test
