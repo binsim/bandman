@@ -23,11 +23,10 @@ jobs:
             - name: Setup Node.js
               uses: actions/setup-node@v4
               with:
-                  node-version: '18.x'
+                  # Use Node 25.x for Prettier checks to match your local environment (v25.2.1).
+                  # We avoid running npm install here to prevent Prisma/node-version conflicts.
+                  node-version: '25.x'
                   cache: 'npm'
-
-            - name: Install dependencies
-              run: npm ci
 
             - name: Run Prettier (check)
               id: prettier-run
