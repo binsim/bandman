@@ -1,33 +1,40 @@
-name: Continuous Integration
+name: Prettier — Continuous Integration
 
-# This action works with pull requests and pushes on the main branch
+# Run on pushes to main and on PR events including when a draft PR is
+# marked "ready for review" so the workflow will start automatically then.
 on:
-    pull_request:
     push:
         branches: [main]
+    pull_request:
+        # include the ready_for_review type so workflows start when a draft is
+        # converted to a regular PR
+        types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
     prettier:
         name: Prettier Check
-        runs-on: ubuntu-lates
-        # Run this job if the event is not a pull request OR the pull request is not a draft.
-        # This prevents the job from running for draft PRs.
+        runs-on: ubuntu-latest
+        # Only run for non-draft pull requests (or non-PR events like push).
         if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft != true }}
         steps:
-            - name: Checkout Repository
-              uses: actions/checkout@v2
+            - name: Checkout repository
+              uses: actions/checkout@v4
 
-            - name: Run Prettier
-              id: prettier-run
-              uses: rutajdash/prettier-cli-action@v1.0.0
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
               with:
-                  config_path: ./.prettierrc.yml
+                  # Use Node 25.x for Prettier checks to match your local environment (v25.2.1).
+                  # We avoid running npm install here to prevent Prisma/node-version conflicts.
+                  node-version: '25.x'
+                  cache: 'npm'
 
-            # This step only runs if prettier finds errors causing the previous step to fail
-            # This steps lists the files where errors were found
-            - name: Prettier Output
+            - name: Run Prettier (check)
+              id: prettier-run
+              run: npx prettier --check .
+
+            - name: Show Prettier output when there are formatting errors
               if: ${{ failure() }}
-              shell: bash
               run: |
-                  echo "The following files are not formatted:"
-                  echo "${{steps.prettier-run.outputs.prettier_output}}"
+                  echo "Prettier found formatting issues. Run 'npx prettier --write .' locally to fix them."
+                  # Show which files differ (prettier --check prints this to stdout/stderr).
+                  npx prettier --check . || true

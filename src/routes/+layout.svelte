@@ -26,7 +26,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-{#if page.url.pathname !== '/login' && page.url.pathname !== '/register'}
+{#if page.url.pathname !== '/login' && page.url.pathname !== '/register' && page.url.pathname !== '/password-forgotten'}
 	<header>
 		<nav>
 			<li><a href="/">Home</a></li>
@@ -42,11 +42,17 @@
 	{@render children()}
 </main>
 
-{#if page.url.pathname !== '/login' && page.url.pathname !== '/register'}
+{#if page.url.pathname !== '/login' && page.url.pathname !== '/register' && page.url.pathname !== '/password-forgotten'}
 	<footer></footer>
 {/if}
 
 <style lang="scss">
+	:global(*) {
+		margin: 0;
+		padding: 0;
+		box-sizing: border-box;
+	}
+
 	header {
 		display: flex;
 		justify-content: space-between;
