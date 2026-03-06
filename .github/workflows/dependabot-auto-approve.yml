@@ -6,7 +6,7 @@ on:
         # should trigger this auto-approve workflow.
         # These names should match the "name:" values of the CI workflows in .github/workflows.
         workflows:
-            - Continuous Integration
+            - Prettier — Continuous Integration
             - Runs Vitest
         types:
             - completed
@@ -34,7 +34,14 @@ jobs:
                   # Use the provided token with pull-request write permissions
                   github-token: ${{ secrets.GITHUB_TOKEN }}
                   script: |
-                      const run = github.context.payload.workflow_run;
+                      // Safely retrieve the workflow_run payload from the available context objects.
+                      // github-script exposes both `github` and `context`. Depending on how the event
+                      // was delivered, the payload may be in one or the other. Use a safe fallback.
+                      const run = (context && context.payload && context.payload.workflow_run) || (github && github.context && github.context.payload && github.context.payload.workflow_run);
+                      if (!run) {
+                        core.info("No workflow_run payload available in the context. Nothing to approve.");
+                        return;
+                      }
                       const prs = run.pull_requests || [];
 
                       if (prs.length === 0) {
@@ -72,8 +79,10 @@ jobs:
                           pull_number
                         });
 
+                        // Determine the actor performing this workflow safely from available context
+                        const actor = (github && github.context && github.context.actor) || (context && context.actor) || '';
                         const alreadyApprovedByBot = reviews.some(r => {
-                          return r.user && r.user.login === github.context.actor && r.state === 'APPROVED';
+                          return r.user && r.user.login === actor && r.state === 'APPROVED';
                         });
 
                         if (alreadyApprovedByBot) {
