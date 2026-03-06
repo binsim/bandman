@@ -1,12 +1,26 @@
 <script lang="ts">
 	interface Props {
 		text: string;
+		type: 'button' | 'submit' | 'reset';
+		onclick?: () => Promise<void>;
 	}
 
-	let { text }: Props = $props();
+	let { text, type, onclick }: Props = $props();
+
+	let isLoading = $state();
 </script>
 
-<button type="submit" class="login-btn">
+<button
+	{type}
+	class={'login-btn ' + (isLoading ? 'loading' : '')}
+	onclick={async () => {
+		if (onclick !== undefined) {
+			isLoading = true;
+			await onclick();
+			isLoading = false;
+		}
+	}}
+>
 	<span class="btn-text">{text}</span>
 	<span class="btn-loader"></span>
 </button>
