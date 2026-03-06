@@ -4,7 +4,7 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "prisma generate && vite dev",
+		"dev": "prisma generate && vite dev --host 0.0.0.0",
 		"build": "prisma generate && vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
