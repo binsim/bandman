@@ -30,6 +30,7 @@
 	<header>
 		<nav>
 			<li><a href="/">Home</a></li>
+			<li><a href="/wishlist">Wishlist</a></li>
 		</nav>
 
 		<div class="logout">
