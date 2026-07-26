@@ -41,8 +41,8 @@ jobs:
               uses: actions/cache@v6
               id: playwright-cache
               with:
-                path: ~/.cache/ms-playwright
-                key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
+                  path: ~/.cache/ms-playwright
+                  key: ${{ runner.os }}-playwright-${{ env.PLAYWRIGHT_VERSION }}
 
             - name: Install Playwright
               if: steps.playwright-cache.outputs.cache-hit != 'true'
