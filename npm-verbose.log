@@ -1,0 +1,60 @@
+npm verbose cli /usr/bin/node /usr/bin/npm
+npm info using npm@12.0.1
+npm info using node@v26.5.0
+npm verbose title npm i
+npm verbose argv "i" "--loglevel" "verbose"
+npm verbose logfile logs-max:10 dir:/home/jonas/.npm/_logs/2026-07-26T13_58_17_259Z-
+npm verbose logfile /home/jonas/.npm/_logs/2026-07-26T13_58_17_259Z-debug-0.log
+npm verbose shrinkwrap failed to load node_modules/.package-lock.json out of date, updated: node_modules
+npm http fetch GET 200 https://registry.npmjs.org/typescript 332ms (cache revalidated)
+npm verbose stack Error: could not resolve
+npm verbose stack     at PlaceDep.failPeerConflict (/usr/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/place-dep.js:509:25)
+npm verbose stack     at new PlaceDep (/usr/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/place-dep.js:157:21)
+npm verbose stack     at #buildDepStep (/usr/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/build-ideal-tree.js:1145:18)
+npm verbose stack     at async Arborist.buildIdealTree (/usr/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/build-ideal-tree.js:188:7)
+npm verbose stack     at async Promise.all (index 1)
+npm verbose stack     at async Arborist.reify (/usr/lib/node_modules/npm/node_modules/@npmcli/arborist/lib/arborist/reify.js:118:5)
+npm verbose stack     at async Install.exec (/usr/lib/node_modules/npm/lib/commands/install.js:176:5)
+npm verbose stack     at async Npm.exec (/usr/lib/node_modules/npm/lib/npm.js:194:9)
+npm verbose stack     at async module.exports (/usr/lib/node_modules/npm/lib/cli/entry.js:67:5)
+npm error code ERESOLVE
+npm error ERESOLVE could not resolve
+npm error
+npm error While resolving: @sveltejs/kit@2.70.1
+npm error Found: typescript@7.0.2
+npm error node_modules/typescript
+npm error   dev typescript@"^7.0.2" from the root project
+npm error   peerOptional typescript@">=5.4.0" from @prisma/client@7.9.0
+npm error   node_modules/@prisma/client
+npm error     @prisma/client@"^7.9.0" from the root project
+npm error   3 more (prisma, svelte-check, valibot)
+npm error
+npm error Could not resolve dependency:
+npm error peerOptional typescript@"^5.3.3 || ^6.0.0" from @sveltejs/kit@2.70.1
+npm error node_modules/@sveltejs/kit
+npm error   dev @sveltejs/kit@"^2.70.1" from the root project
+npm error   peer @sveltejs/kit@"^2.0.0" from @sveltejs/adapter-auto@7.0.1
+npm error   node_modules/@sveltejs/adapter-auto
+npm error     dev @sveltejs/adapter-auto@"^7.0.1" from the root project
+npm error
+npm error Conflicting peer dependency: typescript@6.0.3
+npm error node_modules/typescript
+npm error   peerOptional typescript@"^5.3.3 || ^6.0.0" from @sveltejs/kit@2.70.1
+npm error   node_modules/@sveltejs/kit
+npm error     dev @sveltejs/kit@"^2.70.1" from the root project
+npm error     peer @sveltejs/kit@"^2.0.0" from @sveltejs/adapter-auto@7.0.1
+npm error     node_modules/@sveltejs/adapter-auto
+npm error       dev @sveltejs/adapter-auto@"^7.0.1" from the root project
+npm error
+npm error Fix the upstream dependency conflict, or retry this command with --force or --legacy-peer-deps to accept an incorrect (and potentially broken) dependency resolution.
+npm error
+npm error
+npm error For a full report see:
+npm error /home/jonas/.npm/_logs/2026-07-26T13_58_17_259Z-eresolve-report.txt
+npm verbose cwd /home/jonas/Projects/bandman
+npm verbose os Linux 7.1.4-arch1-1
+npm verbose node v26.5.0
+npm verbose npm  v12.0.1
+npm verbose exit 1
+npm verbose code 1
+npm error A complete log of this run can be found in: /home/jonas/.npm/_logs/2026-07-26T13_58_17_259Z-debug-0.log
