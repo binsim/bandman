@@ -10,6 +10,7 @@ on:
         # include the ready_for_review type so workflows start when a draft is
         # converted to a regular PR
         types: [opened, synchronize, reopened, ready_for_review]
+        paths: "src/**"
 
 jobs:
     build:
