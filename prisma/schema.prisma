@@ -19,6 +19,7 @@ model User {
   passwordHash String
   userSongs UserSong[]
   roles     Role[]
+  wishlistSongVoting WishlistSongVoting[]
 }
 
 model Role {
@@ -76,4 +77,34 @@ model PlaylistSong {
   songId     String
 
   @@id([playlistId, songId])
+}
+
+model WishlistSong {
+  id    String         @id @default(cuid())
+  title  String
+  artist String
+  comment String?
+  link   String?
+  votings WishlistSongVoting[]
+}
+
+enum VotingOption {
+  DEFINITLY_NOT
+  MAYBE_NEED_TRYING
+  NOT_ABLE_TO_PLAY
+  DOES_NOT_SUIT
+  NOT_WHOLE_SONG
+}
+
+model WishlistSongVoting {
+  wishlistSong WishlistSong @relation(fields: [wishlistSongId], references: [id])
+  wishlistSongId String
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  option VotingOption?
+  comment String?
+
+  @@id([wishlistSongId, userId])
 }

@@ -1,9 +1,13 @@
 import prisma from '$lib/prisma';
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
-import { compare, hash } from 'bcrypt-ts';
+import { hash } from 'bcrypt-ts';
 
 export const load: PageServerLoad = async ({ cookies }) => {
+	if (cookies.get('session') !== undefined) {
+		throw redirect(302, '/');
+	}
+
 	return {
 		form: {},
 	};

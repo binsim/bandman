@@ -4,6 +4,10 @@ import { fail, redirect } from '@sveltejs/kit';
 import { compare } from 'bcrypt-ts';
 
 export const load: PageServerLoad = async ({ cookies }) => {
+	if (cookies.get('session') !== undefined) {
+		throw redirect(302, '/');
+	}
+
 	return {
 		form: {},
 	};
