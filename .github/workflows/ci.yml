@@ -1,0 +1,175 @@
+name: CI
+
+on:
+  push:
+    branches: [ main]
+  pull_request:
+    branches: [ main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Clippy (SSR)
+        run: cargo clippy --locked --features ssr --no-default-features -- -D warnings
+      - name: Clippy (hydrate / WASM)
+        run: >
+          cargo clippy --locked --lib
+          --features hydrate --no-default-features
+          --target wasm32-unknown-unknown
+          -- -D warnings
+
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Check SSR
+        run: cargo check --locked --features ssr --no-default-features
+      - name: Check hydrate / WASM
+        run: >
+          cargo check --locked --lib
+          --features hydrate --no-default-features
+          --target wasm32-unknown-unknown
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bandman
+          POSTGRES_PASSWORD: bandman
+          POSTGRES_DB: bandman
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bandman -d bandman"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://bandman:bandman@localhost:5432/bandman
+      SESSION_SECRET: ci-test-session-secret
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: cargo test --locked --features ssr --no-default-features
+
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bandman
+          POSTGRES_PASSWORD: bandman
+          POSTGRES_DB: bandman
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bandman -d bandman"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://bandman:bandman@localhost:5432/bandman
+      SESSION_SECRET: ci-test-session-secret
+      LEPTOS_SITE_ADDR: 127.0.0.1:3000
+      LEPTOS_SITE_ROOT: target/site
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+      CI: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
+
+      - name: Install cargo-leptos
+        run: cargo install cargo-leptos --locked --version 0.3.10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: end2end/package-lock.json
+
+      - name: Install Sass
+        run: npm install -g sass
+
+      - name: Install Playwright
+        working-directory: end2end
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Build app
+        run: cargo leptos build
+
+      - name: Start server
+        run: |
+          nohup ./target/debug/bandman > /tmp/bandman-server.log 2>&1 &
+          echo $! > /tmp/bandman-server.pid
+          for i in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:3000/ >/dev/null; then
+              echo "server is up"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "server failed to start"
+          cat /tmp/bandman-server.log
+          exit 1
+
+      - name: Run Playwright
+        working-directory: end2end
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: end2end/playwright-report/
+          retention-days: 7
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/bandman-server.pid ]; then
+            kill "$(cat /tmp/bandman-server.pid)" || true
+          fi

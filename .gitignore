@@ -1,0 +1,9 @@
+/target
+.env
+uploads/
+.DS_Store
+node_modules/
+end2end/node_modules/
+end2end/test-results/
+end2end/playwright-report/
+*.log

@@ -1,0 +1,102 @@
+[package]
+name = "bandman"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+leptos = { version = "0.8" }
+leptos_router = { version = "0.8" }
+leptos_meta = { version = "0.8" }
+leptos-fluent = { version = "0.3", default-features = false }
+fluent-templates = "0.13"
+serde = { version = "1", features = ["derive"] }
+uuid = { version = "1", features = ["serde", "v4", "js"] }
+chrono = { version = "0.4", features = ["serde", "clock"] }
+thiserror = "2"
+
+# SSR-only
+axum = { version = "0.8", optional = true, features = ["macros"] }
+axum-extra = { version = "0.10", optional = true, features = ["cookie"] }
+tower-http = { version = "0.6", optional = true, features = ["fs"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros"], optional = true }
+leptos_axum = { version = "0.8", optional = true }
+sqlx = { version = "0.8", optional = true, default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls",
+    "postgres",
+    "uuid",
+    "chrono",
+    "migrate",
+    "macros",
+] }
+dotenvy = { version = "0.15", optional = true }
+hmac = { version = "0.12", optional = true }
+sha2 = { version = "0.10", optional = true }
+hex = { version = "0.4", optional = true }
+tracing = { version = "0.1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter"] }
+
+# Hydrate-only
+console_error_panic_hook = { version = "0.1", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+web-sys = { version = "0.3", optional = true, features = [
+    "Window",
+    "Storage",
+    "MediaQueryList",
+] }
+
+[features]
+hydrate = [
+    "leptos/hydrate",
+    "dep:console_error_panic_hook",
+    "dep:wasm-bindgen",
+    "dep:web-sys",
+]
+ssr = [
+    "dep:axum",
+    "dep:axum-extra",
+    "dep:tower-http",
+    "dep:tokio",
+    "dep:leptos_axum",
+    "dep:sqlx",
+    "dep:dotenvy",
+    "dep:hmac",
+    "dep:sha2",
+    "dep:hex",
+    "dep:tracing",
+    "dep:tracing-subscriber",
+    "leptos/ssr",
+    "leptos_meta/ssr",
+    "leptos_router/ssr",
+    "leptos-fluent/ssr",
+    "leptos-fluent/axum",
+]
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[package.metadata.leptos]
+output-name = "bandman"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+style-file = "style/main.scss"
+assets-dir = "public"
+site-addr = "127.0.0.1:3000"
+reload-port = 3001
+end2end-cmd = "npx playwright test"
+end2end-dir = "end2end"
+browserquery = "defaults"
+env = "DEV"
+bin-features = ["ssr"]
+bin-default-features = false
+lib-features = ["hydrate"]
+lib-default-features = false
+lib-profile-release = "wasm-release"
+watch-additional-files = ["locales"]

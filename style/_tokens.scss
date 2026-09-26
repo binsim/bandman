@@ -1,0 +1,52 @@
+// Bandman design tokens — cool slate surfaces, teal accent (not purple / cream-terracotta).
+:root,
+[data-theme="light"] {
+  --color-bg: #e8eef2;
+  --color-bg-accent: #d5e2e8;
+  --color-surface: #f7fafb;
+  --color-surface-raised: #ffffff;
+  --color-border: #c5d0d8;
+  --color-text: #15202b;
+  --color-text-muted: #5a6b78;
+  --color-accent: #0e7c66;
+  --color-accent-hover: #0a6352;
+  --color-accent-soft: rgba(14, 124, 102, 0.12);
+  --color-danger: #b42318;
+  --color-shadow: rgba(21, 32, 43, 0.08);
+  --color-topbar: rgba(247, 250, 251, 0.92);
+}
+
+[data-theme="dark"] {
+  --color-bg: #0f1419;
+  --color-bg-accent: #1a222b;
+  --color-surface: #171d24;
+  --color-surface-raised: #1e262f;
+  --color-border: #2e3a46;
+  --color-text: #e8eef2;
+  --color-text-muted: #9aabba;
+  --color-accent: #2db89a;
+  --color-accent-hover: #45c9ab;
+  --color-accent-soft: rgba(45, 184, 154, 0.16);
+  --color-danger: #f97066;
+  --color-shadow: rgba(0, 0, 0, 0.35);
+  --color-topbar: rgba(15, 20, 25, 0.92);
+}
+
+:root {
+  --font-display: "Sora", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, sans-serif;
+  --radius-sm: 0.4rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1.25rem;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-8: 3rem;
+  --shadow-card: 0 12px 40px var(--color-shadow);
+  --max-content: 68rem;
+  --topbar-height: 3.75rem;
+  --transition: 160ms ease;
+}
