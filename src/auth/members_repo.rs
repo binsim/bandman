@@ -99,7 +99,7 @@ pub async fn list_members(pool: &PgPool) -> Result<Vec<Member>, String> {
         r#"
         SELECT id, name, role, active, created_at, last_login
         FROM members
-        ORDER BY active DESC, name ASC
+        ORDER BY lower(name) ASC, name ASC
         "#,
     )
     .fetch_all(pool)
@@ -152,15 +152,25 @@ pub async fn create_member(
     Member::try_from(row)
 }
 
-pub async fn set_member_name(
+pub async fn update_member_details(
     pool: &PgPool,
     admin_id: Uuid,
     member_id: Uuid,
     name: &str,
-) -> Result<(), String> {
+    role: MemberRole,
+) -> Result<Member, String> {
     let mut transaction = pool.begin().await.map_err(|error| error.to_string())?;
     lock_admin_mutations(&mut transaction).await?;
     ensure_active_admin(&mut transaction, admin_id).await?;
+
+    let (current_role, active) = sqlx::query_as::<_, (String, bool)>(
+        "SELECT role, active FROM members WHERE id = $1 FOR UPDATE",
+    )
+    .bind(member_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|error| error.to_string())?
+    .ok_or_else(|| "Member not found".to_string())?;
 
     let duplicate = sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(SELECT 1 FROM members WHERE lower(name) = lower($1) AND id <> $2)",
@@ -175,60 +185,34 @@ pub async fn set_member_name(
         return Err("A member with this name already exists".to_string());
     }
 
-    let result = sqlx::query("UPDATE members SET name = $1 WHERE id = $2")
-        .bind(name)
-        .bind(member_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| error.to_string())?;
-    if result.rows_affected() == 0 {
-        return Err("Member not found".to_string());
-    }
-
-    transaction
-        .commit()
-        .await
-        .map_err(|error| error.to_string())
-}
-
-pub async fn set_member_role(
-    pool: &PgPool,
-    admin_id: Uuid,
-    member_id: Uuid,
-    role: MemberRole,
-) -> Result<(), String> {
-    let mut transaction = pool.begin().await.map_err(|error| error.to_string())?;
-    lock_admin_mutations(&mut transaction).await?;
-    ensure_active_admin(&mut transaction, admin_id).await?;
-
-    let current = sqlx::query_as::<_, (String, bool)>(
-        "SELECT role, active FROM members WHERE id = $1 FOR UPDATE",
-    )
-    .bind(member_id)
-    .fetch_optional(&mut *transaction)
-    .await
-    .map_err(|error| error.to_string())?
-    .ok_or_else(|| "Member not found".to_string())?;
-
-    if current.0 == MemberRole::Admin.as_str()
-        && current.1
+    if current_role == MemberRole::Admin.as_str()
+        && active
         && !role.is_admin()
         && active_admin_count(&mut transaction).await? <= 1
     {
         return Err("At least one active admin must remain".to_string());
     }
 
-    sqlx::query("UPDATE members SET role = $1 WHERE id = $2")
-        .bind(role.as_str())
-        .bind(member_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| error.to_string())?;
+    let row = sqlx::query_as::<_, MemberRow>(
+        r#"
+        UPDATE members
+        SET name = $1, role = $2
+        WHERE id = $3
+        RETURNING id, name, role, active, created_at, last_login
+        "#,
+    )
+    .bind(name)
+    .bind(role.as_str())
+    .bind(member_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|error| error.to_string())?;
 
     transaction
         .commit()
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    Member::try_from(row)
 }
 
 pub async fn set_member_active(
@@ -236,7 +220,7 @@ pub async fn set_member_active(
     admin_id: Uuid,
     member_id: Uuid,
     active: bool,
-) -> Result<(), String> {
+) -> Result<Member, String> {
     let mut transaction = pool.begin().await.map_err(|error| error.to_string())?;
     lock_admin_mutations(&mut transaction).await?;
     ensure_active_admin(&mut transaction, admin_id).await?;
@@ -258,17 +242,25 @@ pub async fn set_member_active(
         return Err("At least one active admin must remain".to_string());
     }
 
-    sqlx::query("UPDATE members SET active = $1 WHERE id = $2")
-        .bind(active)
-        .bind(member_id)
-        .execute(&mut *transaction)
-        .await
-        .map_err(|error| error.to_string())?;
+    let row = sqlx::query_as::<_, MemberRow>(
+        r#"
+        UPDATE members
+        SET active = $1
+        WHERE id = $2
+        RETURNING id, name, role, active, created_at, last_login
+        "#,
+    )
+    .bind(active)
+    .bind(member_id)
+    .fetch_one(&mut *transaction)
+    .await
+    .map_err(|error| error.to_string())?;
 
     transaction
         .commit()
         .await
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    Member::try_from(row)
 }
 
 pub async fn delete_member(pool: &PgPool, admin_id: Uuid, member_id: Uuid) -> Result<(), String> {

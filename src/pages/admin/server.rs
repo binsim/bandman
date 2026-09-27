@@ -24,27 +24,16 @@ pub(super) async fn admin_create_member(
         .map_err(ServerFnError::new)
 }
 
-/// Renames a member while keeping the member ID and session history unchanged.
-#[server(AdminSetMemberName, "/api")]
-pub(super) async fn admin_set_member_name(
+/// Updates a member's name and role atomically.
+#[server(AdminUpdateMemberDetails, "/api")]
+pub(super) async fn admin_update_member_details(
     member_id: Uuid,
     name: String,
-) -> Result<(), ServerFnError> {
+    role: MemberRole,
+) -> Result<Member, ServerFnError> {
     let name = validate_member_name(name).map_err(ServerFnError::new)?;
     let (pool, admin_id) = require_admin().await?;
-    crate::auth::members_repo::set_member_name(&pool, admin_id, member_id, &name)
-        .await
-        .map_err(ServerFnError::new)
-}
-
-/// Changes a member's role.
-#[server(AdminSetMemberRole, "/api")]
-pub(super) async fn admin_set_member_role(
-    member_id: Uuid,
-    role: MemberRole,
-) -> Result<(), ServerFnError> {
-    let (pool, admin_id) = require_admin().await?;
-    crate::auth::members_repo::set_member_role(&pool, admin_id, member_id, role)
+    crate::auth::members_repo::update_member_details(&pool, admin_id, member_id, &name, role)
         .await
         .map_err(ServerFnError::new)
 }
@@ -54,7 +43,7 @@ pub(super) async fn admin_set_member_role(
 pub(super) async fn admin_set_member_active(
     member_id: Uuid,
     active: bool,
-) -> Result<(), ServerFnError> {
+) -> Result<Member, ServerFnError> {
     let (pool, admin_id) = require_admin().await?;
     crate::auth::members_repo::set_member_active(&pool, admin_id, member_id, active)
         .await

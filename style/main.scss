@@ -368,6 +368,12 @@ a {
   .field {
     margin-bottom: 0;
   }
+
+  .input,
+  .select {
+    height: 2.5rem;
+    padding-block: 0.35rem;
+  }
 }
 
 .input {
@@ -437,6 +443,11 @@ a {
 .admin-feedback {
   margin: var(--space-3) 0 0;
   color: var(--color-accent);
+}
+
+.admin-row-feedback {
+  margin: var(--space-2) 0 0;
+  text-align: left;
 }
 
 .status-badge {
