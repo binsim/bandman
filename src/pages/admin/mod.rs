@@ -329,7 +329,11 @@ fn MemberRow(
     });
 
     view! {
-        <tr data-testid="admin-member-row" data-member-name=move || name_input.get()>
+        <tr
+            data-testid="admin-member-row"
+            data-member-id=member_id.to_string()
+            data-member-name=move || name_input.get()
+        >
             <td data-label=move || tr!("admin-column-name")>
                 <div class="admin-role-control">
                     <input
@@ -372,6 +376,7 @@ fn MemberRow(
             <td class="admin-actions">
                 <MemberRowActions
                     active
+                    member_name=name_input
                     is_current_member
                     pending
                     dirty
@@ -390,6 +395,7 @@ fn MemberRow(
 #[component]
 fn MemberRowActions(
     active: RwSignal<bool>,
+    member_name: RwSignal<String>,
     is_current_member: bool,
     pending: RwSignal<bool>,
     dirty: Memo<bool>,
@@ -445,27 +451,65 @@ fn MemberRowActions(
                 .into_any()
             }}
         </div>
+        {view! {
+            <MemberDeleteDialog
+                confirming_delete
+                member_name
+                pending
+                on_delete
+            />
+        }
+        .into_any()}
+    }
+}
+
+#[component]
+fn MemberDeleteDialog(
+    confirming_delete: RwSignal<bool>,
+    member_name: RwSignal<String>,
+    pending: RwSignal<bool>,
+    on_delete: Callback<()>,
+) -> impl IntoView {
+    view! {
         <Show when=move || confirming_delete.get()>
-            <div class="admin-delete-confirm">
-                <p>{move || tr!("admin-confirm-delete")}</p>
-                <button
-                    class="btn btn-ghost btn-danger btn-sm"
-                    type="button"
-                    data-testid="admin-confirm-delete"
-                    on:click=move |_| on_delete.run(())
-                    disabled=move || pending.get()
+            <div class="admin-delete-backdrop">
+                <section
+                    class="admin-delete-dialog"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label=move || tr!("admin-delete-title")
+                    on:keydown=move |event: leptos::ev::KeyboardEvent| {
+                        if event.key() == "Escape" {
+                            confirming_delete.set(false);
+                        }
+                    }
                 >
-                    {move || tr!("admin-delete")}
-                </button>
-                <button
-                    class="btn btn-ghost btn-sm"
-                    type="button"
-                    data-testid="admin-cancel-delete"
-                    on:click=move |_| confirming_delete.set(false)
-                    disabled=move || pending.get()
-                >
-                    {move || tr!("admin-cancel")}
-                </button>
+                    <div class="admin-delete-dialog-content">
+                        <h2>{move || tr!("admin-delete-title")}</h2>
+                        <p>{move || tr!("admin-confirm-delete", {"name" => member_name.get()})}</p>
+                        <div class="admin-delete-dialog-actions">
+                            <button
+                                class="btn btn-ghost btn-danger btn-sm"
+                                type="button"
+                                data-testid="admin-confirm-delete"
+                                on:click=move |_| on_delete.run(())
+                                disabled=move || pending.get()
+                            >
+                                {move || tr!("admin-delete")}
+                            </button>
+                            <button
+                                class="btn btn-ghost btn-sm"
+                                type="button"
+                                data-testid="admin-cancel-delete"
+                                on:click=move |_| confirming_delete.set(false)
+                                disabled=move || pending.get()
+                                autofocus
+                            >
+                                {move || tr!("admin-cancel")}
+                            </button>
+                        </div>
+                    </div>
+                </section>
             </div>
         </Show>
     }

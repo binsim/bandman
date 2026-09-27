@@ -30,8 +30,13 @@ test.describe("Admin member management", () => {
     );
     await page.getByTestId("admin-create-member").click();
 
-    const memberRow = page.locator(`[data-member-name="${memberName}"]`);
-    await expect(memberRow).toBeVisible();
+    const createdMemberRow = page.locator(`[data-member-name="${memberName}"]`);
+    await expect(createdMemberRow).toBeVisible();
+    const memberId = await createdMemberRow.getAttribute("data-member-id");
+    if (!memberId) {
+      throw new Error("Created member row is missing its stable member ID");
+    }
+    const memberRow = page.locator(`[data-member-id="${memberId}"]`);
 
     const nameInputHeight = await memberRow
       .getByTestId("admin-member-name-input")
@@ -76,8 +81,8 @@ test.describe("Admin member management", () => {
     );
     await expect(memberRow.getByTestId("admin-row-error")).toHaveCount(0);
     await expect(page.getByTestId("admin-member-row").first()).toHaveAttribute(
-      "data-member-name",
-      memberName,
+      "data-member-id",
+      memberId,
     );
     await memberRow.getByTestId("admin-reset-member").click();
     await memberRow.getByTestId("admin-toggle-active").click();
@@ -126,11 +131,29 @@ test.describe("Admin member management", () => {
     await page.getByRole("link", { name: "Admin" }).click();
 
     await renamedRow.getByTestId("admin-delete-member").click();
+    const deleteDialog = page.getByRole("dialog", { name: "Delete member?" });
+    await expect(deleteDialog).toBeVisible();
+    await expect(deleteDialog).toContainText(
+      `Permanently delete ${renamedMember}?`,
+    );
+    await expect(deleteDialog).toHaveCSS("text-align", "left");
+    const deleteButtonBox = await deleteDialog
+      .getByTestId("admin-confirm-delete")
+      .boundingBox();
+    const cancelButtonBox = await deleteDialog
+      .getByTestId("admin-cancel-delete")
+      .boundingBox();
+    expect(deleteButtonBox).not.toBeNull();
+    expect(cancelButtonBox).not.toBeNull();
+    expect(cancelButtonBox!.y).toBe(deleteButtonBox!.y);
     await renamedRow.getByTestId("admin-cancel-delete").click();
+    await expect(deleteDialog).toBeHidden();
     await expect(renamedRow).toBeVisible();
 
     await renamedRow.getByTestId("admin-delete-member").click();
+    await expect(deleteDialog).toBeVisible();
     await renamedRow.getByTestId("admin-confirm-delete").click();
+    await expect(deleteDialog).toBeHidden();
     await expect(renamedRow).toBeHidden();
     await expect(page.getByTestId("admin-table-feedback")).toHaveCount(0);
   });

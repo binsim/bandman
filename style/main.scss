@@ -450,6 +450,44 @@ a {
   text-align: left;
 }
 
+.admin-delete-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgb(0 0 0 / 0.5);
+}
+
+.admin-delete-dialog {
+  width: min(28rem, 100%);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+  box-shadow: var(--shadow-card);
+  text-align: left;
+}
+
+.admin-delete-dialog-content {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+
+  h2,
+  p {
+    margin: 0;
+  }
+}
+
+.admin-delete-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
 .status-badge {
   display: inline-block;
   padding: 0.15rem 0.55rem;
