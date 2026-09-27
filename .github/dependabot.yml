@@ -2,20 +2,44 @@ version: 2
 updates:
   - package-ecosystem: cargo
     directory: /
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
+    groups:
+      non-breaking:
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: npm
     directory: /end2end
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
+    groups:
+      non-breaking:
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: github-actions
     directory: /
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
+    groups:
+      non-breaking:
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: docker
     directory: /
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
+    groups:
+      non-breaking:
+        update-types:
+          - minor
+          - patch
