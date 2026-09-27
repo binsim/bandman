@@ -120,7 +120,18 @@ jobs:
           shared-key: e2e
 
       - name: Install cargo-leptos
-        run: cargo install cargo-leptos --locked --version 0.3.10
+        run: |
+          archive="cargo-leptos-x86_64-unknown-linux-gnu.tar.gz"
+          url="https://github.com/leptos-rs/cargo-leptos/releases/download/v0.3.10/$archive"
+          checksum="128dbbf9c5331c42013130c5a7b5a16957302a11a5d699e7982ba43ec5d7ab25"
+          tmp_dir="$(mktemp -d)"
+          curl --fail --location --silent --show-error "$url" --output "$tmp_dir/$archive"
+          echo "$checksum  $tmp_dir/$archive" | sha256sum --check
+          tar -xzf "$tmp_dir/$archive" -C "$tmp_dir"
+          mkdir -p "$HOME/.cargo/bin"
+          install "$tmp_dir/cargo-leptos-x86_64-unknown-linux-gnu/cargo-leptos" \
+            "$HOME/.cargo/bin/cargo-leptos"
+          cargo leptos --version
 
       - uses: actions/setup-node@v4
         with:
