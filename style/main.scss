@@ -412,6 +412,17 @@ a {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+
+  > .input,
+  > .select,
+  > .btn {
+    height: 2.5rem;
+  }
+
+  > .input,
+  > .select {
+    padding-block: 0.35rem;
+  }
 }
 
 .admin-role-select {

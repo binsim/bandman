@@ -26,6 +26,22 @@ test.describe("Admin member management", () => {
     const memberRow = page.locator(`[data-member-name="${memberName}"]`);
     await expect(memberRow).toBeVisible();
 
+    const nameInputHeight = await memberRow
+      .getByTestId("admin-member-name-input")
+      .evaluate((element) => element.getBoundingClientRect().height);
+    await expect(memberRow.getByTestId("admin-save-name")).toHaveCSS(
+      "height",
+      `${nameInputHeight}px`,
+    );
+
+    const roleSelectHeight = await memberRow
+      .locator("select")
+      .evaluate((element) => element.getBoundingClientRect().height);
+    await expect(memberRow.getByTestId("admin-save-role")).toHaveCSS(
+      "height",
+      `${roleSelectHeight}px`,
+    );
+
     await memberRow.locator("select").selectOption("participant");
     await memberRow.getByTestId("admin-save-role").click();
     await expect(memberRow.locator("select")).toHaveValue("participant");
