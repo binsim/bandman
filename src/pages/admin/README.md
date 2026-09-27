@@ -10,7 +10,7 @@ Manage **band members** (who can log in by name).
 
 - List members (name, role, active, last login)
 - Create member by **name** (unique)
-- Set role: `admin` | `member`
+- Set role: `admin` | `member` | `participant`
 - Deactivate / reactivate members (soft delete via `active`)
 - Protect route: only `MemberRole::Admin`
 - Ensure at least one admin remains

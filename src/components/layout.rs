@@ -23,13 +23,29 @@ pub fn AppShell(children: Children) -> impl IntoView {
                     <span class="brand-mark">"♪"</span>
                     <span class="brand-name" data-testid="brand-name">"Bandman"</span>
                 </A>
-                <nav class="topbar-nav" aria-label="Main">
-                    <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
-                    <A href="/program">{move || tr!("nav-program")}</A>
-                    <A href="/plan">{move || tr!("nav-plan")}</A>
-                    <A href="/finance">{move || tr!("nav-finance")}</A>
-                    <A href="/admin">{move || tr!("nav-admin")}</A>
-                </nav>
+                <Suspense fallback=|| ()>
+                    {move || match member.get() {
+                        Some(Some(m)) => view! {
+                            <nav class="topbar-nav" aria-label="Main">
+                                <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
+                                <A href="/program">{move || tr!("nav-program")}</A>
+                                <A href="/plan">{move || tr!("nav-plan")}</A>
+                                {if m.role.is_participant() || m.role.is_admin() {
+                                    view! { <A href="/finance">{move || tr!("nav-finance")}</A> }.into_any()
+                                } else {
+                                    view! {}.into_any()
+                                }}
+                                {if m.role.is_admin() {
+                                    view! { <A href="/admin">{move || tr!("nav-admin")}</A> }.into_any()
+                                } else {
+                                    view! {}.into_any()
+                                }}
+                            </nav>
+                        }
+                        .into_any(),
+                        _ => view! {}.into_any(),
+                    }}
+                </Suspense>
                 <div class="topbar-actions">
                     <LanguageSwitcher />
                     <ThemeToggle />

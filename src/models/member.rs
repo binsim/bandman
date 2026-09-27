@@ -8,6 +8,7 @@ use uuid::Uuid;
 pub enum MemberRole {
     Admin,
     Member,
+    Participant,
 }
 
 impl MemberRole {
@@ -15,6 +16,7 @@ impl MemberRole {
         match self {
             Self::Admin => "admin",
             Self::Member => "member",
+            Self::Participant => "participant",
         }
     }
 
@@ -22,12 +24,17 @@ impl MemberRole {
         match value {
             "admin" => Some(Self::Admin),
             "member" => Some(Self::Member),
+            "participant" => Some(Self::Participant),
             _ => None,
         }
     }
 
     pub fn is_admin(self) -> bool {
         matches!(self, Self::Admin)
+    }
+
+    pub fn is_participant(self) -> bool {
+        matches!(self, Self::Participant)
     }
 }
 
@@ -68,16 +75,27 @@ impl From<Member> for MemberSummary {
 
 #[cfg(test)]
 mod tests {
+
     use super::*;
 
     #[test]
     fn role_roundtrips() {
         assert_eq!(MemberRole::parse("admin"), Some(MemberRole::Admin));
         assert_eq!(MemberRole::parse("member"), Some(MemberRole::Member));
+        assert_eq!(
+            MemberRole::parse("participant"),
+            Some(MemberRole::Participant)
+        );
         assert_eq!(MemberRole::parse("nope"), None);
         assert!(MemberRole::Admin.is_admin());
+        assert!(!MemberRole::Admin.is_participant());
         assert!(!MemberRole::Member.is_admin());
+        assert!(!MemberRole::Member.is_participant());
+        assert!(!MemberRole::Participant.is_admin());
+        assert!(MemberRole::Participant.is_participant());
         assert_eq!(MemberRole::Admin.as_str(), "admin");
+        assert_eq!(MemberRole::Member.as_str(), "member");
+        assert_eq!(MemberRole::Participant.as_str(), "participant");
     }
 
     #[test]
