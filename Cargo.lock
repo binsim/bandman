@@ -222,7 +222,7 @@ dependencies = [
  "chrono",
  "console_error_panic_hook",
  "dotenvy",
- "fluent-templates 0.13.3",
+ "fluent-templates",
  "hex",
  "hmac 0.12.1",
  "leptos",
@@ -782,47 +782,17 @@ dependencies = [
 
 [[package]]
 name = "fluent-template-macros"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "748050b3fb6fd97b566aedff8e9e021389c963e73d5afbeb92752c2b8d686c6c"
-dependencies = [
- "flume 0.11.1",
- "ignore",
- "proc-macro2",
- "quote",
- "syn 2.0.119",
- "unic-langid",
-]
-
-[[package]]
-name = "fluent-template-macros"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f17b7ed5b7108d57ca049e1fa7583d4fadbb71ef0e47a72dc847c1e704f37fb"
 dependencies = [
+ "flume 0.11.1",
+ "ignore",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
  "unic-langid",
  "walkdir",
-]
-
-[[package]]
-name = "fluent-templates"
-version = "0.13.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56264446a01f404469aef9cc5fd4a4d736f68a0f52482bf6d1a54d6e9bbd9476"
-dependencies = [
- "fluent-bundle",
- "fluent-langneg",
- "fluent-syntax",
- "fluent-template-macros 0.13.3",
- "flume 0.11.1",
- "ignore",
- "intl-memoizer",
- "log",
- "thiserror 2.0.21",
- "unic-langid",
 ]
 
 [[package]]
@@ -834,7 +804,9 @@ dependencies = [
  "fluent-bundle",
  "fluent-langneg",
  "fluent-syntax",
- "fluent-template-macros 0.15.1",
+ "fluent-template-macros",
+ "flume 0.11.1",
+ "ignore",
  "intl-memoizer",
  "log",
  "thiserror 2.0.21",
@@ -1552,7 +1524,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "76a9b1c4c153c8549453cec5eeb55421e8943693a8af63c5c28ee2faab77dce3"
 dependencies = [
  "fluent-bundle",
- "fluent-templates 0.15.1",
+ "fluent-templates",
  "leptos",
  "leptos-fluent-macros",
  "leptos_meta",
@@ -1570,7 +1542,7 @@ dependencies = [
  "current_platform",
  "fluent-bundle",
  "fluent-syntax",
- "fluent-templates 0.15.1",
+ "fluent-templates",
  "globwalk",
  "pathdiff",
  "proc-macro2",
@@ -3628,7 +3600,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
