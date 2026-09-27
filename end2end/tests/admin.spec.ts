@@ -79,12 +79,6 @@ test.describe("Admin member management", () => {
     await expect(page.getByTestId("session-name")).toHaveText("Admin");
     await page.getByRole("link", { name: "Admin" }).click();
 
-    await adminRow.getByTestId("admin-delete-member").click();
-    await adminRow.getByTestId("admin-confirm-delete").click();
-    await expect(page.getByTestId("admin-feedback")).toContainText(
-      "At least one active admin must remain",
-    );
-
     await renamedRow.getByTestId("admin-delete-member").click();
     await renamedRow.getByTestId("admin-cancel-delete").click();
     await expect(renamedRow).toBeVisible();

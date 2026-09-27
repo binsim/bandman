@@ -1,4 +1,6 @@
-use crate::auth::{
+mod server;
+
+use self::server::{
     admin_create_member, admin_delete_member, admin_list_members, admin_set_member_active,
     admin_set_member_name, admin_set_member_role,
 };
