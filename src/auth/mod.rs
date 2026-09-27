@@ -150,6 +150,15 @@ pub async fn admin_set_member_active(member_id: Uuid, active: bool) -> Result<()
         .map_err(ServerFnError::new)
 }
 
+/// Permanently deletes a member.
+#[server(AdminDeleteMember, "/api")]
+pub async fn admin_delete_member(member_id: Uuid) -> Result<(), ServerFnError> {
+    let (pool, admin_id) = require_admin().await?;
+    members_repo::delete_member(&pool, admin_id, member_id)
+        .await
+        .map_err(ServerFnError::new)
+}
+
 #[cfg(feature = "ssr")]
 fn validate_member_name(name: String) -> Result<String, &'static str> {
     let name = name.trim();

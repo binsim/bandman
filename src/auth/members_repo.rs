@@ -271,6 +271,43 @@ pub async fn set_member_active(
         .map_err(|error| error.to_string())
 }
 
+pub async fn delete_member(pool: &PgPool, admin_id: Uuid, member_id: Uuid) -> Result<(), String> {
+    let mut transaction = pool.begin().await.map_err(|error| error.to_string())?;
+    lock_admin_mutations(&mut transaction).await?;
+    ensure_active_admin(&mut transaction, admin_id).await?;
+
+    if admin_id == member_id {
+        return Err("You cannot delete your own account".to_string());
+    }
+
+    let (role, active) = sqlx::query_as::<_, (String, bool)>(
+        "SELECT role, active FROM members WHERE id = $1 FOR UPDATE",
+    )
+    .bind(member_id)
+    .fetch_optional(&mut *transaction)
+    .await
+    .map_err(|error| error.to_string())?
+    .ok_or_else(|| "Member not found".to_string())?;
+
+    if role == MemberRole::Admin.as_str()
+        && active
+        && active_admin_count(&mut transaction).await? <= 1
+    {
+        return Err("At least one active admin must remain".to_string());
+    }
+
+    sqlx::query("DELETE FROM members WHERE id = $1")
+        .bind(member_id)
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| error.to_string())?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|error| error.to_string())
+}
+
 async fn lock_admin_mutations(
     transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
 ) -> Result<(), String> {

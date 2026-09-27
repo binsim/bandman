@@ -1,31 +1,39 @@
 use crate::auth::{
-    admin_create_member, admin_list_members, admin_set_member_active, admin_set_member_name,
-    admin_set_member_role,
+    admin_create_member, admin_delete_member, admin_list_members, admin_set_member_active,
+    admin_set_member_name, admin_set_member_role,
 };
-use crate::models::{Member, MemberRole};
+use crate::models::{Member, MemberRole, MemberSummary};
 use leptos::prelude::*;
 use leptos_fluent::tr;
+use uuid::Uuid;
 
 #[component]
 pub fn AdminPage() -> impl IntoView {
-    let revision = RwSignal::new(0_u64);
     let auth_revision = expect_context::<RwSignal<u64>>();
-    let members = Resource::new(
-        move || revision.get(),
-        |_| async move { admin_list_members().await },
-    );
+    let current_member = expect_context::<Resource<Option<MemberSummary>>>();
+    let members = Resource::new(|| (), |_| async move { admin_list_members().await });
     let feedback = RwSignal::new(Option::<(bool, String)>::None);
     let on_member_created = Callback::new(move |_| {
-        revision.update(|value| *value += 1);
+        members.refetch();
     });
-    let on_members_changed = Callback::new(move |_| {
-        revision.update(|value| *value += 1);
-        auth_revision.update(|value| *value += 1);
+    let on_members_changed = Callback::new(move |member_id| {
+        members.refetch();
+        if current_member
+            .get_untracked()
+            .flatten()
+            .is_some_and(|member| member.id == member_id)
+        {
+            auth_revision.update(|value| *value += 1);
+        }
     });
 
     view! {
         <section class="admin-page">
-            <AdminHeader />
+            <header class="admin-header">
+                <p class="eyebrow">{move || tr!("admin-eyebrow")}</p>
+                <h1>{move || tr!("admin-title")}</h1>
+                <p class="lead">{move || tr!("admin-lead")}</p>
+            </header>
 
             <Suspense fallback=move || {
                 view! { <p class="muted">{move || tr!("admin-loading")}</p> }
@@ -40,43 +48,20 @@ pub fn AdminPage() -> impl IntoView {
                     }
                     .into_any(),
                     Some(Ok(member_list)) => view! {
-                        <AdminContent
-                            members=member_list
-                            on_member_created
-                            on_members_changed
-                            feedback
-                        />
+                        <div class="admin-content">
+                             <CreateMemberForm on_created=on_member_created feedback />
+                             <MembersTable
+                                members=member_list
+                                current_member_id=current_member.get().flatten().map(|member| member.id)
+                                on_members_changed
+                                feedback
+                             />
+                        </div>
                     }
                     .into_any(),
                 }}
             </Suspense>
         </section>
-    }
-}
-
-#[component]
-fn AdminHeader() -> impl IntoView {
-    view! {
-        <header class="admin-header">
-            <p class="eyebrow">{move || tr!("admin-eyebrow")}</p>
-            <h1>{move || tr!("admin-title")}</h1>
-            <p class="lead">{move || tr!("admin-lead")}</p>
-        </header>
-    }
-}
-
-#[component]
-fn AdminContent(
-    members: Vec<Member>,
-    on_member_created: Callback<()>,
-    on_members_changed: Callback<()>,
-    feedback: RwSignal<Option<(bool, String)>>,
-) -> impl IntoView {
-    view! {
-        <div class="admin-content">
-            {view! { <CreateMemberForm on_created=on_member_created feedback /> }.into_any()}
-            {view! { <MembersTable members on_members_changed feedback /> }.into_any()}
-        </div>
     }
 }
 
@@ -170,12 +155,23 @@ fn CreateMemberForm(
 #[component]
 fn MembersTable(
     members: Vec<Member>,
-    on_members_changed: Callback<()>,
+    current_member_id: Option<Uuid>,
+    on_members_changed: Callback<Uuid>,
     feedback: RwSignal<Option<(bool, String)>>,
 ) -> impl IntoView {
     let rows = members
         .into_iter()
-        .map(|member| view! { <MemberRow member on_change=on_members_changed feedback /> })
+        .map(|member| {
+            let is_current_member = current_member_id == Some(member.id);
+            view! {
+                <MemberRow
+                    member
+                    is_current_member
+                    on_change=on_members_changed
+                    feedback
+                />
+            }
+        })
         .collect_view();
 
     view! {
@@ -202,12 +198,14 @@ fn MembersTable(
 #[component]
 fn MemberRow(
     member: Member,
-    on_change: Callback<()>,
+    is_current_member: bool,
+    on_change: Callback<Uuid>,
     feedback: RwSignal<Option<(bool, String)>>,
 ) -> impl IntoView {
     let role = RwSignal::new(member.role.as_str().to_string());
     let name_input = RwSignal::new(member.name.clone());
     let pending = RwSignal::new(false);
+    let confirming_delete = RwSignal::new(false);
     let member_id = member.id;
     let original_name = member.name.clone();
     let original_role = member.role.as_str().to_string();
@@ -228,7 +226,7 @@ fn MemberRow(
             match admin_set_member_name(member_id, name_value).await {
                 Ok(()) => {
                     feedback.set(Some((true, tr!("admin-name-updated"))));
-                    on_change.run(());
+                    on_change.run(member_id);
                 }
                 Err(error) => feedback.set(Some((false, error.to_string()))),
             }
@@ -248,7 +246,7 @@ fn MemberRow(
             match admin_set_member_role(member_id, role_value).await {
                 Ok(()) => {
                     feedback.set(Some((true, tr!("admin-role-updated"))));
-                    on_change.run(());
+                    on_change.run(member_id);
                 }
                 Err(error) => {
                     role.set(original_role);
@@ -266,10 +264,26 @@ fn MemberRow(
             match admin_set_member_active(member_id, !active).await {
                 Ok(()) => {
                     feedback.set(Some((true, tr!("admin-status-updated"))));
-                    on_change.run(());
+                    on_change.run(member_id);
                 }
                 Err(error) => feedback.set(Some((false, error.to_string()))),
             }
+            pending.set(false);
+        });
+    };
+
+    let delete_member = move |_| {
+        pending.set(true);
+        feedback.set(None);
+        leptos::task::spawn_local(async move {
+            match admin_delete_member(member_id).await {
+                Ok(()) => {
+                    feedback.set(Some((true, tr!("admin-member-deleted"))));
+                    on_change.run(member_id);
+                }
+                Err(error) => feedback.set(Some((false, error.to_string()))),
+            }
+            confirming_delete.set(false);
             pending.set(false);
         });
     };
@@ -332,15 +346,56 @@ fn MemberRow(
             </td>
             <td data-label=move || tr!("admin-column-last-login")>{last_login}</td>
             <td class="admin-actions">
-                <button
-                    class="btn btn-ghost btn-sm"
-                    type="button"
-                    data-testid="admin-toggle-active"
-                    on:click=toggle_active
-                    disabled=move || pending.get()
-                >
-                    {if active { tr!("admin-deactivate") } else { tr!("admin-reactivate") }}
-                </button>
+                <div class="admin-role-control">
+                    <button
+                        class="btn btn-ghost btn-sm"
+                        type="button"
+                        data-testid="admin-toggle-active"
+                        on:click=toggle_active
+                        disabled=move || pending.get()
+                    >
+                        {if active { tr!("admin-deactivate") } else { tr!("admin-reactivate") }}
+                    </button>
+                    {if is_current_member {
+                        ().into_any()
+                    } else {
+                        view! {
+                            <button
+                                class="btn btn-ghost btn-danger btn-sm"
+                                type="button"
+                                data-testid="admin-delete-member"
+                                on:click=move |_| confirming_delete.set(true)
+                                disabled=move || pending.get() || confirming_delete.get()
+                            >
+                                {move || tr!("admin-delete")}
+                            </button>
+                        }
+                        .into_any()
+                    }}
+                </div>
+                <Show when=move || confirming_delete.get()>
+                    <div class="admin-delete-confirm">
+                        <p>{move || tr!("admin-confirm-delete")}</p>
+                        <button
+                            class="btn btn-ghost btn-danger btn-sm"
+                            type="button"
+                            data-testid="admin-confirm-delete"
+                            on:click=delete_member
+                            disabled=move || pending.get()
+                        >
+                            {move || tr!("admin-delete")}
+                        </button>
+                        <button
+                            class="btn btn-ghost btn-sm"
+                            type="button"
+                            data-testid="admin-cancel-delete"
+                            on:click=move |_| confirming_delete.set(false)
+                            disabled=move || pending.get()
+                        >
+                            {move || tr!("admin-cancel")}
+                        </button>
+                    </div>
+                </Show>
             </td>
         </tr>
     }

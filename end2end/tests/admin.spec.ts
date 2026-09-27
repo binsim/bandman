@@ -51,6 +51,7 @@ test.describe("Admin member management", () => {
     await expect(page.getByTestId("admin-feedback")).toContainText(
       "At least one active admin must remain",
     );
+    await expect(adminRow.getByTestId("admin-delete-member")).toBeHidden();
 
     await page.getByTestId("logout-button").click();
     await expect(page).toHaveURL(/\/login$/);
@@ -68,5 +69,31 @@ test.describe("Admin member management", () => {
 
     await page.goto("/admin");
     await expect(page.getByTestId("admin-access-denied")).toBeVisible();
+
+    await page.getByTestId("logout-button").click();
+    await expect(page).toHaveURL(/\/login$/);
+    await page
+      .getByTestId("login-member-select")
+      .selectOption({ label: "Admin" });
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("session-name")).toHaveText("Admin");
+    await page.getByRole("link", { name: "Admin" }).click();
+
+    await adminRow.getByTestId("admin-delete-member").click();
+    await adminRow.getByTestId("admin-confirm-delete").click();
+    await expect(page.getByTestId("admin-feedback")).toContainText(
+      "At least one active admin must remain",
+    );
+
+    await renamedRow.getByTestId("admin-delete-member").click();
+    await renamedRow.getByTestId("admin-cancel-delete").click();
+    await expect(renamedRow).toBeVisible();
+
+    await renamedRow.getByTestId("admin-delete-member").click();
+    await renamedRow.getByTestId("admin-confirm-delete").click();
+    await expect(renamedRow).toBeHidden();
+    await expect(page.getByTestId("admin-feedback")).toContainText(
+      "Member deleted.",
+    );
   });
 });

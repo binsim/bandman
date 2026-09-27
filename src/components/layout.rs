@@ -15,6 +15,7 @@ pub fn AppShell(children: Children) -> impl IntoView {
         move || auth_revision.get(),
         |_| async move { current_member().await.ok().flatten() },
     );
+    provide_context(member);
 
     view! {
         <div class="app-shell">
