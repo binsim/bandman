@@ -1,8 +1,8 @@
 use crate::components::layout::AppShell;
 use crate::components::theme::{provide_theme, ThemeRoot};
 use crate::pages::{
-    admin::AdminPage, finance::FinancePage,  login::LoginPage, plan::PlanPage,
-    program::ProgramPage, wishlist::WishlistPage,
+    admin::AdminPage, finance::FinancePage, login::LoginPage, plan::PlanPage, program::ProgramPage,
+    wishlist::WishlistPage,
 };
 use leptos::prelude::*;
 use leptos_fluent::leptos_fluent;

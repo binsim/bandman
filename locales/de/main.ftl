@@ -34,3 +34,36 @@ login-error-generic = Anmeldung fehlgeschlagen. Bitte erneut versuchen.
 ## Stubs
 stub-coming-soon = Diese Seite ist noch nicht gebaut.
 stub-see-readme = Im README-Ordner dieser Seite steht, was geplant ist.
+
+## Admin
+admin-eyebrow = Bandverwaltung
+admin-title = Mitglieder
+admin-lead = Mitgliederkonten erstellen sowie Rollen und Zugriff verwalten.
+admin-loading = Mitglieder werden geladen…
+admin-access-denied-title = Admin-Zugriff erforderlich
+admin-access-denied = Melde dich mit einem aktiven Admin-Konto an, um Mitglieder zu verwalten.
+admin-add-title = Mitglied hinzufügen
+admin-name-label = Name
+admin-role-label = Rolle
+admin-rename = Umbenennen
+admin-role-admin = Admin
+admin-role-member = Mitglied
+admin-role-participant = Teilnehmer
+admin-add-button = Mitglied hinzufügen
+admin-member-created = Mitglied erstellt.
+admin-members-title = Alle Mitglieder
+admin-column-name = Name
+admin-column-role = Rolle
+admin-column-status = Status
+admin-column-last-login = Letzte Anmeldung
+admin-column-actions = Aktionen
+admin-never = Nie
+admin-save = Speichern
+admin-role-updated = Mitgliederrolle geändert.
+admin-name-updated = Mitgliedsname geändert.
+admin-status-updated = Mitgliedsstatus geändert.
+admin-active = Aktiv
+admin-inactive = Inaktiv
+admin-deactivate = Deaktivieren
+admin-reactivate = Reaktivieren
+admin-error-role = Wähle eine gültige Rolle.

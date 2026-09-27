@@ -29,20 +29,20 @@ pub fn AppShell(children: Children) -> impl IntoView {
                             <nav class="topbar-nav" aria-label="Main">
                                 <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
                                 <A href="/plan">{move || tr!("nav-plan")}</A>
-                                {if m.role.is_participant() || m.role.is_admin() {
+                                {if m.role.is_participant() {
                                     view! { <A href="/finance">{move || tr!("nav-finance")}</A> }.into_any()
                                 } else {
-                                    view! {}.into_any()
+                                    ().into_any()
                                 }}
                                 {if m.role.is_admin() {
                                     view! { <A href="/admin">{move || tr!("nav-admin")}</A> }.into_any()
                                 } else {
-                                    view! {}.into_any()
+                                    ().into_any()
                                 }}
                             </nav>
                         }
                         .into_any(),
-                        _ => view! {}.into_any(),
+                        _ => ().into_any(),
                     }}
                 </Suspense>
                 <div class="topbar-actions">

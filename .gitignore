@@ -3,6 +3,8 @@
 uploads/
 .DS_Store
 node_modules/
+test-results/
+playwright-report/
 end2end/node_modules/
 end2end/test-results/
 end2end/playwright-report/

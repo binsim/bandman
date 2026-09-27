@@ -1,19 +1,20 @@
 # Admin panel
 
-**Status:** Not started (stub route only)
+**Status:** Member management implemented
 
 ## Purpose
 
 Manage **band members** (who can log in by name).
 
-## Planned behaviour
+## Implemented behaviour
 
 - List members (name, role, active, last login)
 - Create member by **name** (unique)
+- Rename members without changing their IDs or session history
 - Set role: `admin` | `member` | `participant`
 - Deactivate / reactivate members (soft delete via `active`)
-- Protect route: only `MemberRole::Admin`
-- Ensure at least one admin remains
+- Protect member-management server functions: only active `MemberRole::Admin` accounts
+- Prevent demoting or deactivating the last active admin
 
 ## Existing foundation
 
@@ -24,4 +25,3 @@ Manage **band members** (who can log in by name).
 ## Optional later
 
 - Shared band PIN on top of name login
-- Rename members without breaking session history
