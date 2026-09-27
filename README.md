@@ -3,7 +3,7 @@
 [![CI](https://github.com/binsim/bandman/actions/workflows/ci.yml/badge.svg)](https://github.com/binsim/bandman/actions/workflows/ci.yml)
 [![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
 [![Leptos](https://img.shields.io/badge/leptos-0.8-blue.svg)](https://leptos.dev/)
-[![License](https://img.shields.io/badge/license-undecided-lightgrey.svg)](#license)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
 
 Band management web app written in **Rust** (Leptos + Axum), running on **Docker** with **PostgreSQL**.
 

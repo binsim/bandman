@@ -13,6 +13,7 @@ pub fn LoginPage() -> impl IntoView {
     let error = RwSignal::new(Option::<String>::None);
     let pending = RwSignal::new(false);
     let navigate = use_navigate();
+    let auth_revision = expect_context::<RwSignal<u64>>();
 
     let on_submit = move |ev: leptos::ev::SubmitEvent| {
         ev.prevent_default();
@@ -28,6 +29,7 @@ pub fn LoginPage() -> impl IntoView {
             match login_as_member(name).await {
                 Ok(_) => {
                     pending.set(false);
+                    auth_revision.update(|revision| *revision += 1);
                     navigate("/", Default::default());
                 }
                 Err(e) => {

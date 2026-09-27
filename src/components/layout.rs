@@ -8,8 +8,11 @@ use leptos_router::components::A;
 
 #[component]
 pub fn AppShell(children: Children) -> impl IntoView {
+    let auth_revision = RwSignal::new(0_u64);
+    provide_context(auth_revision);
+
     let member = Resource::new(
-        || (),
+        move || auth_revision.get(),
         |_| async move { current_member().await.ok().flatten() },
     );
 
@@ -53,8 +56,14 @@ pub fn AppShell(children: Children) -> impl IntoView {
 #[component]
 fn LoggedInControls(member: MemberSummary) -> impl IntoView {
     let name = member.name.clone();
-    let logout_action = Action::new(|_| async move {
-        let _ = logout().await;
+    let auth_revision = expect_context::<RwSignal<u64>>();
+    let logout_action = Action::new(move |_| {
+        let auth_revision = auth_revision;
+        async move {
+            if logout().await.is_ok() {
+                auth_revision.update(|revision| *revision += 1);
+            }
+        }
     });
 
     Effect::new(move |_| {
