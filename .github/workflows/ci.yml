@@ -13,7 +13,7 @@ env:
 
 jobs:
   fmt:
-    name: fmt
+    name: Rust formatting
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -24,7 +24,7 @@ jobs:
       - run: cargo fmt --all -- --check
 
   clippy:
-    name: clippy
+    name: Clippy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,7 +44,7 @@ jobs:
           -- -D warnings
 
   check:
-    name: check
+    name: Compile checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -62,7 +62,7 @@ jobs:
           --target wasm32-unknown-unknown
 
   test:
-    name: test
+    name: Unit tests
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     services:
@@ -92,7 +92,7 @@ jobs:
         run: cargo test --locked --features ssr --no-default-features
 
   e2e:
-    name: e2e
+    name: End-to-end tests
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     services:
