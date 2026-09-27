@@ -1,7 +1,7 @@
 use crate::components::layout::AppShell;
 use crate::components::theme::{provide_theme, ThemeRoot};
 use crate::pages::{
-    admin::AdminPage, finance::FinancePage, home::HomePage, login::LoginPage, plan::PlanPage,
+    admin::AdminPage, finance::FinancePage,  login::LoginPage, plan::PlanPage,
     program::ProgramPage, wishlist::WishlistPage,
 };
 use leptos::prelude::*;
@@ -55,10 +55,9 @@ pub fn App() -> impl IntoView {
                                 </section>
                             }
                         }>
-                            <Route path=StaticSegment("") view=HomePage/>
+                            <Route path=StaticSegment("") view=ProgramPage/>
                             <Route path=StaticSegment("login") view=LoginPage/>
                             <Route path=StaticSegment("wishlist") view=WishlistPage/>
-                            <Route path=StaticSegment("program") view=ProgramPage/>
                             <Route path=StaticSegment("plan") view=PlanPage/>
                             <Route path=StaticSegment("finance") view=FinancePage/>
                             <Route path=StaticSegment("admin") view=AdminPage/>

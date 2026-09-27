@@ -28,7 +28,6 @@ pub fn AppShell(children: Children) -> impl IntoView {
                         Some(Some(m)) => view! {
                             <nav class="topbar-nav" aria-label="Main">
                                 <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
-                                <A href="/program">{move || tr!("nav-program")}</A>
                                 <A href="/plan">{move || tr!("nav-plan")}</A>
                                 {if m.role.is_participant() || m.role.is_admin() {
                                     view! { <A href="/finance">{move || tr!("nav-finance")}</A> }.into_any()
