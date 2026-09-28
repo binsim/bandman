@@ -1,7 +1,7 @@
 use crate::auth::{current_member, logout};
 use crate::components::language::LanguageSwitcher;
 use crate::components::theme::ThemeToggle;
-use crate::models::MemberSummary;
+use crate::models::Member;
 use leptos::prelude::*;
 use leptos_fluent::tr;
 use leptos_router::components::A;
@@ -70,7 +70,7 @@ pub fn AppShell(children: Children) -> impl IntoView {
 }
 
 #[component]
-fn LoggedInControls(member: MemberSummary) -> impl IntoView {
+fn LoggedInControls(member: Member) -> impl IntoView {
     let name = member.name.clone();
     let auth_revision = expect_context::<RwSignal<u64>>();
     let logout_action = Action::new(move |_| {

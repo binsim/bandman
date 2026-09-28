@@ -1,3 +1,3 @@
 pub mod member;
 
-pub use member::{Member, MemberRole, MemberSummary};
+pub use member::{Member, MemberRole};

@@ -46,12 +46,13 @@ test.describe("Admin member management", () => {
       `${nameInputHeight}px`,
     );
     await expect(memberRow.getByTestId("admin-save-member")).toBeDisabled();
+    await expect(memberRow.getByTestId("admin-save-member-role")).toBeDisabled();
     await expect(memberRow.getByTestId("admin-reset-member")).toBeDisabled();
 
     const roleSelectHeight = await memberRow
       .locator("select")
       .evaluate((element) => element.getBoundingClientRect().height);
-    await expect(memberRow.getByTestId("admin-save-member")).toHaveCSS(
+    await expect(memberRow.getByTestId("admin-save-member-role")).toHaveCSS(
       "height",
       `${roleSelectHeight}px`,
     );
@@ -69,6 +70,7 @@ test.describe("Admin member management", () => {
     );
     await expect(memberRow.locator("select")).toHaveValue("member");
     await expect(memberRow.getByTestId("admin-save-member")).toBeDisabled();
+    await expect(memberRow.getByTestId("admin-save-member-role")).toBeDisabled();
     await memberRow.locator("select").selectOption("participant");
 
     await memberRow
@@ -90,12 +92,13 @@ test.describe("Admin member management", () => {
 
     const renamedMember = `${memberName} Renamed`;
     await memberRow.getByTestId("admin-member-name-input").fill(renamedMember);
-    await memberRow.locator("select").selectOption("participant");
     await memberRow.getByTestId("admin-save-member").click();
     const renamedRow = page.locator(`[data-member-name="${renamedMember}"]`);
     await expect(renamedRow).toBeVisible();
-    await expect(renamedRow.getByTestId("admin-row-error")).toHaveCount(0);
+    await memberRow.locator("select").selectOption("participant");
+    await renamedRow.getByTestId("admin-save-member-role").click();
     await expect(renamedRow.locator("select")).toHaveValue("participant");
+    await expect(renamedRow.getByTestId("admin-row-error")).toHaveCount(0);
 
     const adminRow = page.locator('[data-member-name="Admin"]');
     await adminRow.getByTestId("admin-toggle-active").click();

@@ -1,6 +1,7 @@
 //! Signed session cookie helpers (SSR).
 
 use hmac::{Hmac, Mac};
+use leptos::prelude::*;
 use sha2::Sha256;
 use uuid::Uuid;
 
@@ -50,6 +51,32 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
         .zip(b.iter())
         .fold(0u8, |acc, (x, y)| acc | (x ^ y))
         == 0
+}
+
+#[cfg(feature = "ssr")]
+pub async fn require_admin() -> Result<(sqlx::PgPool, Uuid), ServerFnError> {
+    use axum_extra::extract::CookieJar;
+    use leptos_axum::extract;
+    use sqlx::PgPool;
+
+    let cookies: CookieJar = extract().await?;
+    let cookie = cookies
+        .get(crate::auth::session::cookie_name())
+        .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
+    let admin_id = crate::auth::session::verify_session_value(cookie.value())
+        .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
+
+    let pool = expect_context::<PgPool>();
+    let member = crate::models::Member::find_active_by_id(&pool, admin_id)
+        .await
+        .map_err(|error| ServerFnError::new(error.to_string()))?
+        .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
+
+    if !member.role.is_admin() {
+        return Err(ServerFnError::new("Administrator access required"));
+    }
+
+    Ok((pool, admin_id))
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 //! Login page — name-based member picker.
 
 use crate::auth::{list_members, login_as_member};
-use crate::models::MemberSummary;
+use crate::models::Member;
 use leptos::prelude::*;
 use leptos_fluent::tr;
 use leptos_router::hooks::use_navigate;
@@ -102,7 +102,7 @@ pub fn LoginPage() -> impl IntoView {
 }
 
 #[component]
-fn MemberSelect(members: Vec<MemberSummary>, selected: RwSignal<String>) -> impl IntoView {
+fn MemberSelect(members: Vec<Member>, selected: RwSignal<String>) -> impl IntoView {
     let options = members
         .into_iter()
         .map(|m| {

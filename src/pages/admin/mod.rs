@@ -1,10 +1,14 @@
+mod create_member;
 mod server;
 
 use self::server::{
-    admin_create_member, admin_delete_member, admin_list_members, admin_set_member_active,
-    admin_update_member_details,
+    admin_delete_member, admin_list_members, admin_set_member_active, admin_update_member_name,
+    admin_update_member_role,
 };
-use crate::models::{Member, MemberRole, MemberSummary};
+use crate::{
+    models::{Member, MemberRole},
+    pages::admin::create_member::CreateMemberForm,
+};
 use leptos::prelude::*;
 use leptos_fluent::tr;
 use uuid::Uuid;
@@ -14,7 +18,7 @@ type MemberFeedback = Option<(Uuid, String)>;
 #[component]
 pub fn AdminPage() -> impl IntoView {
     let auth_revision = expect_context::<RwSignal<u64>>();
-    let current_member = expect_context::<Resource<Option<MemberSummary>>>();
+    let current_member = expect_context::<Resource<Option<Member>>>();
     let members = Resource::new(|| (), |_| async move { admin_list_members().await });
     let on_member_updated = Callback::new(move |member: Member| {
         if current_member
@@ -119,82 +123,6 @@ fn sort_members(members: &mut [Member]) {
 }
 
 #[component]
-fn CreateMemberForm(on_created: Callback<Member>) -> impl IntoView {
-    let name = RwSignal::new(String::new());
-    let role = RwSignal::new(MemberRole::Member.as_str().to_string());
-    let pending = RwSignal::new(false);
-    let error = RwSignal::new(Option::<String>::None);
-    let on_create = move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
-        let name_value = name.get();
-        let Some(role_value) = MemberRole::parse(&role.get()) else {
-            error.set(Some(tr!("admin-error-role")));
-            return;
-        };
-
-        pending.set(true);
-        error.set(None);
-        leptos::task::spawn_local(async move {
-            match admin_create_member(name_value, role_value).await {
-                Ok(member) => {
-                    name.set(String::new());
-                    on_created.run(member);
-                }
-                Err(message) => error.set(Some(message.to_string())),
-            }
-            pending.set(false);
-        });
-    };
-
-    view! {
-        <section class="admin-card">
-            <h2>{move || tr!("admin-add-title")}</h2>
-            <form class="admin-create-form" on:submit=on_create>
-                <label class="field">
-                    <span class="field-label">{move || tr!("admin-name-label")}</span>
-                    <input
-                        class="input"
-                        data-testid="admin-member-name"
-                        type="text"
-                        maxlength="80"
-                        required
-                        prop:value=move || name.get()
-                        on:input=move |event| name.set(event_target_value(&event))
-                    />
-                </label>
-                <label class="field">
-                    <span class="field-label">{move || tr!("admin-role-label")}</span>
-                    <select
-                        class="select"
-                        data-testid="admin-member-role"
-                        prop:value=move || role.get()
-                        on:change=move |event| role.set(event_target_value(&event))
-                    >
-                        <option value="admin">{move || tr!("admin-role-admin")}</option>
-                        <option value="member">{move || tr!("admin-role-member")}</option>
-                        <option value="participant">{move || tr!("admin-role-participant")}</option>
-                    </select>
-                </label>
-                <button
-                    class="btn btn-primary"
-                    data-testid="admin-create-member"
-                    type="submit"
-                    disabled=move || pending.get()
-                >
-                    {move || tr!("admin-add-button")}
-                </button>
-            </form>
-
-            <Show when=move || error.get().is_some()>
-                <p class="form-error" role="alert" data-testid="admin-create-error">
-                    {move || error.get().unwrap_or_default()}
-                </p>
-            </Show>
-        </section>
-    }
-}
-
-#[component]
 fn MembersTable(
     members: RwSignal<Vec<Member>>,
     current_member_id: Option<Uuid>,
@@ -255,9 +183,9 @@ fn MemberRow(
     let pending = RwSignal::new(false);
     let confirming_delete = RwSignal::new(false);
     let member_id = member.id;
-    let dirty = Memo::new(move |_| {
-        name_input.get().trim() != original_name.get() || role.get() != original_role.get()
-    });
+    let name_dirty = Memo::new(move |_| name_input.get().trim() != original_name.get());
+    let role_dirty = Memo::new(move |_| role.get() != original_role.get());
+    let dirty = Memo::new(move |_| name_dirty.get() || role_dirty.get());
     let last_login = member
         .last_login
         .map(|time| time.format("%Y-%m-%d %H:%M UTC").to_string())
@@ -265,19 +193,34 @@ fn MemberRow(
     let role_label = move || format!("{}: {}", tr!("admin-role-label"), name_input.get());
     let active = RwSignal::new(member.active);
 
-    let save_details = Callback::new(move |_| {
-        let Some(role_value) = MemberRole::parse(&role.get()) else {
-            feedback.set(Some((member_id, tr!("admin-error-role"))));
-            return;
-        };
+    let save_name = Callback::new(move |_| {
         let name_value = name_input.get();
         pending.set(true);
         feedback.set(None);
         leptos::task::spawn_local(async move {
-            match admin_update_member_details(member_id, name_value, role_value).await {
+            match admin_update_member_name(member_id, name_value).await {
                 Ok(updated_member) => {
                     name_input.set(updated_member.name.clone());
                     original_name.set(updated_member.name.clone());
+                    feedback.set(None);
+                    on_change.run(updated_member);
+                }
+                Err(error) => feedback.set(Some((member_id, error.to_string()))),
+            }
+            pending.set(false);
+        });
+    });
+
+    let save_role = Callback::new(move |_| {
+        let Some(role_value) = MemberRole::parse(&role.get()) else {
+            feedback.set(Some((member_id, tr!("admin-error-role"))));
+            return;
+        };
+        pending.set(true);
+        feedback.set(None);
+        leptos::task::spawn_local(async move {
+            match admin_update_member_role(member_id, role_value).await {
+                Ok(updated_member) => {
                     role.set(updated_member.role.as_str().to_string());
                     original_role.set(updated_member.role.as_str().to_string());
                     feedback.set(None);
@@ -379,9 +322,12 @@ fn MemberRow(
                     member_name=name_input
                     is_current_member
                     pending
+                    name_dirty
+                    role_dirty
                     dirty
                     confirming_delete
-                    on_save=save_details
+                    on_save_name=save_name
+                    on_save_role=save_role
                     on_reset=reset_details
                     on_toggle_active=toggle_active
                     on_delete=delete_member
@@ -398,9 +344,12 @@ fn MemberRowActions(
     member_name: RwSignal<String>,
     is_current_member: bool,
     pending: RwSignal<bool>,
+    name_dirty: Memo<bool>,
+    role_dirty: Memo<bool>,
     dirty: Memo<bool>,
     confirming_delete: RwSignal<bool>,
-    on_save: Callback<()>,
+    on_save_name: Callback<()>,
+    on_save_role: Callback<()>,
     on_reset: Callback<()>,
     on_toggle_active: Callback<()>,
     on_delete: Callback<()>,
@@ -411,10 +360,19 @@ fn MemberRowActions(
                 class="btn btn-ghost btn-sm"
                 type="button"
                 data-testid="admin-save-member"
-                on:click=move |_| on_save.run(())
-                disabled=move || pending.get() || !dirty.get()
+                on:click=move |_| on_save_name.run(())
+                disabled=move || pending.get() || !name_dirty.get()
             >
-                {move || tr!("admin-save")}
+                {move || tr!("admin-save-name")}
+            </button>
+            <button
+                class="btn btn-ghost btn-sm"
+                type="button"
+                data-testid="admin-save-member-role"
+                on:click=move |_| on_save_role.run(())
+                disabled=move || pending.get() || !role_dirty.get()
+            >
+                {move || tr!("admin-save-role")}
             </button>
             <button
                 class="btn btn-ghost btn-sm"
