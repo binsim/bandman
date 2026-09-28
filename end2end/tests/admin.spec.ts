@@ -46,7 +46,9 @@ test.describe("Admin member management", () => {
       `${nameInputHeight}px`,
     );
     await expect(memberRow.getByTestId("admin-save-member")).toBeDisabled();
-    await expect(memberRow.getByTestId("admin-save-member-role")).toBeDisabled();
+    await expect(
+      memberRow.getByTestId("admin-save-member-role"),
+    ).toBeDisabled();
     await expect(memberRow.getByTestId("admin-reset-member")).toBeDisabled();
 
     const roleSelectHeight = await memberRow
@@ -70,7 +72,9 @@ test.describe("Admin member management", () => {
     );
     await expect(memberRow.locator("select")).toHaveValue("member");
     await expect(memberRow.getByTestId("admin-save-member")).toBeDisabled();
-    await expect(memberRow.getByTestId("admin-save-member-role")).toBeDisabled();
+    await expect(
+      memberRow.getByTestId("admin-save-member-role"),
+    ).toBeDisabled();
     await memberRow.locator("select").selectOption("participant");
 
     await memberRow
