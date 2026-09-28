@@ -20,7 +20,7 @@ thiserror = "2"
 # SSR-only
 axum = { version = "0.8", optional = true, features = ["macros"] }
 axum-extra = { version = "0.12", optional = true, features = ["cookie"] }
-tower-http = { version = "0.6", optional = true, features = ["fs"] }
+tower-http = { version = "0.7", optional = true, features = ["fs"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros"], optional = true }
 leptos_axum = { version = "0.8", optional = true }
 sqlx = { version = "0.9", optional = true, default-features = false, features = [
