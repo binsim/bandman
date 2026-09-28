@@ -85,14 +85,16 @@ test.describe("Admin member management", () => {
     const createdMemberRow = page.locator(`[data-member-name="${memberName}"]`);
     await expect(createdMemberRow).toBeVisible();
     await expect(adminRow).toBeVisible();
-    const rowNamesAfterCreate = await page
-      .getByTestId("admin-member-row")
-      .evaluateAll((rows) =>
-        rows.map((row) => row.getAttribute("data-member-name")),
-      );
-    expect(rowNamesAfterCreate.indexOf(memberName)).toBeLessThan(
-      rowNamesAfterCreate.indexOf("Admin"),
-    );
+    await expect
+      .poll(async () => {
+        const rowNames = await page
+          .getByTestId("admin-member-row")
+          .evaluateAll((rows) =>
+            rows.map((row) => row.getAttribute("data-member-name")),
+          );
+        return rowNames.indexOf(memberName) < rowNames.indexOf("Admin");
+      })
+      .toBe(true);
     const memberId = await createdMemberRow.getAttribute("data-member-id");
     if (!memberId) {
       throw new Error("Created member row is missing its stable member ID");
@@ -160,14 +162,16 @@ test.describe("Admin member management", () => {
     await memberRow.getByTestId("admin-save-member").click();
     const renamedRow = page.locator(`[data-member-name="${renamedMember}"]`);
     await expect(renamedRow).toBeVisible();
-    const rowNamesAfterRename = await page
-      .getByTestId("admin-member-row")
-      .evaluateAll((rows) =>
-        rows.map((row) => row.getAttribute("data-member-name")),
-      );
-    expect(rowNamesAfterRename.indexOf("Admin")).toBeLessThan(
-      rowNamesAfterRename.indexOf(renamedMember),
-    );
+    await expect
+      .poll(async () => {
+        const rowNames = await page
+          .getByTestId("admin-member-row")
+          .evaluateAll((rows) =>
+            rows.map((row) => row.getAttribute("data-member-name")),
+          );
+        return rowNames.indexOf("Admin") < rowNames.indexOf(renamedMember);
+      })
+      .toBe(true);
     await memberRow.locator("select").selectOption("participant");
     await renamedRow.getByTestId("admin-save-member-role").click();
     await expect(renamedRow.locator("select")).toHaveValue("participant");
@@ -217,9 +221,14 @@ test.describe("Admin member management", () => {
     await renamedRow.getByTestId("admin-delete-member").click();
     const deleteDialog = page.getByRole("dialog", { name: "Delete member?" });
     await expect(deleteDialog).toBeVisible();
-    await expect(deleteDialog).toContainText(
-      `Permanently delete ${renamedMember}?`,
-    );
+    await expect
+      .poll(async () =>
+        (await deleteDialog.locator("p").textContent())?.replace(
+          /[\u2066-\u2069]/g,
+          "",
+        ),
+      )
+      .toBe(`Permanently delete ${renamedMember}?`);
     await expect(deleteDialog).toHaveCSS("text-align", "left");
     const deleteButtonBox = await deleteDialog
       .getByTestId("admin-confirm-delete")
