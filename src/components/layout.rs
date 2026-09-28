@@ -1,7 +1,7 @@
 use crate::auth::{current_member, logout};
 use crate::components::language::LanguageSwitcher;
 use crate::components::theme::ThemeToggle;
-use crate::models::Member;
+use crate::models::{Member, MemberRole};
 use leptos::prelude::*;
 use leptos_fluent::tr;
 use leptos_router::components::A;
@@ -30,12 +30,12 @@ pub fn AppShell(children: Children) -> impl IntoView {
                             <nav class="topbar-nav" aria-label="Main">
                                 <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
                                 <A href="/plan">{move || tr!("nav-plan")}</A>
-                                {if m.role.is_participant() {
+                                {if m.role == MemberRole::Participant || m.role == MemberRole::Admin {
                                     view! { <A href="/finance">{move || tr!("nav-finance")}</A> }.into_any()
                                 } else {
                                     ().into_any()
                                 }}
-                                {if m.role.is_admin() {
+                                {if m.role == MemberRole::Admin {
                                     view! { <A href="/admin">{move || tr!("nav-admin")}</A> }.into_any()
                                 } else {
                                     ().into_any()

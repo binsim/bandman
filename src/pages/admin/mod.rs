@@ -176,10 +176,10 @@ fn MemberRow(
     on_deleted: Callback<Uuid>,
     feedback: RwSignal<MemberFeedback>,
 ) -> impl IntoView {
-    let role = RwSignal::new(member.role.as_str().to_string());
+    let role = RwSignal::new(member.role);
     let name_input = RwSignal::new(member.name.clone());
     let original_name = RwSignal::new(member.name.clone());
-    let original_role = RwSignal::new(member.role.as_str().to_string());
+    let original_role = RwSignal::new(member.role);
     let pending = RwSignal::new(false);
     let confirming_delete = RwSignal::new(false);
     let member_id = member.id;
@@ -212,17 +212,14 @@ fn MemberRow(
     });
 
     let save_role = Callback::new(move |_| {
-        let Some(role_value) = MemberRole::parse(&role.get()) else {
-            feedback.set(Some((member_id, tr!("admin-error-role"))));
-            return;
-        };
+        let role_value = role.get();
         pending.set(true);
         feedback.set(None);
         leptos::task::spawn_local(async move {
             match admin_update_member_role(member_id, role_value).await {
                 Ok(updated_member) => {
-                    role.set(updated_member.role.as_str().to_string());
-                    original_role.set(updated_member.role.as_str().to_string());
+                    role.set(updated_member.role);
+                    original_role.set(updated_member.role);
                     feedback.set(None);
                     on_change.run(updated_member);
                 }
@@ -296,13 +293,18 @@ fn MemberRow(
                     <select
                         class="select admin-role-select"
                         aria-label=role_label
-                        prop:value=move || role.get()
-                        on:change=move |event| role.set(event_target_value(&event))
+                        prop:value=move || role.get().to_string()
+                        on:change=move |event| {
+                            match event_target_value(&event).parse::<MemberRole>() {
+                                Ok(value) => role.set(value),
+                                Err(_) => feedback.set(Some((member_id, tr!("admin-error-role")))),
+                            }
+                        }
                         disabled=move || pending.get()
                     >
-                        <option value="admin">{move || tr!("admin-role-admin")}</option>
-                        <option value="member">{move || tr!("admin-role-member")}</option>
-                        <option value="participant">{move || tr!("admin-role-participant")}</option>
+                        <option value=MemberRole::Admin.to_string()>{move || tr!("admin-role-admin")}</option>
+                        <option value=MemberRole::Member.to_string()>{move || tr!("admin-role-member")}</option>
+                        <option value=MemberRole::Participant.to_string()>{move || tr!("admin-role-participant")}</option>
                     </select>
                 </div>
             </td>

@@ -26,16 +26,13 @@ async fn admin_create_member(name: String, role: MemberRole) -> Result<Member, S
 #[component]
 pub fn CreateMemberForm(on_created: Callback<Member>) -> impl IntoView {
     let name = RwSignal::new(String::new());
-    let role = RwSignal::new(MemberRole::Member.as_str().to_string());
+    let role = RwSignal::new(MemberRole::Member);
     let pending = RwSignal::new(false);
     let error = RwSignal::new(Option::<String>::None);
     let on_create = move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         let name_value = name.get();
-        let Some(role_value) = MemberRole::parse(&role.get()) else {
-            error.set(Some(tr!("admin-error-role")));
-            return;
-        };
+        let role_value = role.get();
 
         pending.set(true);
         error.set(None);
@@ -72,12 +69,17 @@ pub fn CreateMemberForm(on_created: Callback<Member>) -> impl IntoView {
                     <select
                         class="select"
                         data-testid="admin-member-role"
-                        prop:value=move || role.get()
-                        on:change=move |event| role.set(event_target_value(&event))
+                        prop:value=move || role.get().to_string()
+                        on:change=move |event| {
+                            match event_target_value(&event).parse::<MemberRole>() {
+                                Ok(value) => role.set(value),
+                                Err(_) => error.set(Some(tr!("admin-error-role"))),
+                            }
+                        }
                     >
-                        <option value="admin">{move || tr!("admin-role-admin")}</option>
-                        <option value="member">{move || tr!("admin-role-member")}</option>
-                        <option value="participant">{move || tr!("admin-role-participant")}</option>
+                        <option value=MemberRole::Admin.to_string()>{move || tr!("admin-role-admin")}</option>
+                        <option value=MemberRole::Member.to_string()>{move || tr!("admin-role-member")}</option>
+                        <option value=MemberRole::Participant.to_string()>{move || tr!("admin-role-participant")}</option>
                     </select>
                 </label>
                 <button

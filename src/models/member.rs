@@ -2,6 +2,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
 use sqlx::{postgres::PgRow, FromRow, PgPool, Row};
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// Band member role used for authorization.
@@ -13,49 +14,29 @@ pub enum MemberRole {
     Participant,
 }
 
-impl MemberRole {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Admin => "admin",
-            Self::Member => "member",
-            Self::Participant => "participant",
-        }
-    }
+impl FromStr for MemberRole {
+    type Err = std::io::Error;
 
-    pub fn parse(value: &str) -> Option<Self> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "admin" => Some(Self::Admin),
-            "member" => Some(Self::Member),
-            "participant" => Some(Self::Participant),
-            _ => None,
-        }
-    }
-
-    pub fn is_admin(self) -> bool {
-        matches!(self, Self::Admin)
-    }
-
-    pub fn is_participant(self) -> bool {
-        matches!(self, Self::Participant)
-    }
-}
-
-impl TryFrom<String> for MemberRole {
-    type Error = std::io::Error;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        Self::parse(&value).ok_or_else(|| {
-            std::io::Error::new(
+            "admin" => Ok(Self::Admin),
+            "member" => Ok(Self::Member),
+            "participant" => Ok(Self::Participant),
+            _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("unknown member role: {value}"),
-            )
-        })
+            )),
+        }
     }
 }
 
 impl std::fmt::Display for MemberRole {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
+        f.write_str(match self {
+            Self::Admin => "admin",
+            Self::Member => "member",
+            Self::Participant => "participant",
+        })
     }
 }
 
@@ -89,10 +70,12 @@ pub enum MemberError {
 impl<'r> FromRow<'r, PgRow> for Member {
     fn from_row(row: &'r PgRow) -> Result<Self, sqlx::Error> {
         let role: String = row.try_get("role")?;
-        let role = MemberRole::try_from(role).map_err(|error| sqlx::Error::ColumnDecode {
-            index: "role".to_string(),
-            source: Box::new(error),
-        })?;
+        let role = role
+            .parse::<MemberRole>()
+            .map_err(|error| sqlx::Error::ColumnDecode {
+                index: "role".to_string(),
+                source: Box::new(error),
+            })?;
 
         Ok(Self {
             id: row.try_get("id")?,
@@ -193,7 +176,7 @@ impl Member {
         )
         .bind(Uuid::new_v4())
         .bind(name)
-        .bind(role.as_str())
+        .bind(role.to_string())
         .fetch_optional(&mut *transaction)
         .await?;
         let Some(member) = member else {
@@ -259,7 +242,7 @@ impl Member {
             RETURNING id, name, role, active, created_at, last_login
             "#,
         )
-        .bind(role.as_str())
+        .bind(role.to_string())
         .bind(self.id)
         .fetch_optional(&mut *transaction)
         .await?;
@@ -392,33 +375,33 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn role_roundtrips() {
-        assert_eq!(MemberRole::parse("admin"), Some(MemberRole::Admin));
-        assert_eq!(MemberRole::parse("member"), Some(MemberRole::Member));
-        assert_eq!(
-            MemberRole::parse("participant"),
-            Some(MemberRole::Participant)
-        );
-        assert_eq!(MemberRole::parse("nope"), None);
-        assert!(MemberRole::Admin.is_admin());
-        assert!(!MemberRole::Admin.is_participant());
-        assert!(!MemberRole::Member.is_admin());
-        assert!(!MemberRole::Member.is_participant());
-        assert!(!MemberRole::Participant.is_admin());
-        assert!(MemberRole::Participant.is_participant());
-        assert_eq!(MemberRole::Admin.as_str(), "admin");
-        assert_eq!(MemberRole::Member.as_str(), "member");
-        assert_eq!(MemberRole::Participant.as_str(), "participant");
-    }
+    #[sqlx::test(migrations = "./migrations")]
+    async fn database_persists_and_retrieves_all_member_roles(pool: PgPool) {
+        async fn assert_role_persists(pool: &PgPool, role: MemberRole) {
+            let name = format!("Role {role} {}", Uuid::new_v4());
+            let created = Member::create(pool, &name, role)
+                .await
+                .expect("member should be created with the role");
+            let retrieved = Member::find_by_id(pool, created.id)
+                .await
+                .expect("member query should succeed")
+                .expect("created member should exist");
 
-    #[test]
-    fn role_converts_from_database_value() {
-        assert!(matches!(
-            MemberRole::try_from("participant".to_string()),
-            Ok(MemberRole::Participant)
-        ));
-        assert!(MemberRole::try_from("unknown".to_string()).is_err());
+            assert_eq!(created.role, role);
+            assert_eq!(retrieved.role, role);
+        }
+
+        for role in [
+            MemberRole::Admin,
+            MemberRole::Member,
+            MemberRole::Participant,
+        ] {
+            match role {
+                MemberRole::Admin => assert_role_persists(&pool, role).await,
+                MemberRole::Member => assert_role_persists(&pool, role).await,
+                MemberRole::Participant => assert_role_persists(&pool, role).await,
+            }
+        }
     }
 
     #[test]

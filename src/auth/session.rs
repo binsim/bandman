@@ -82,7 +82,7 @@ pub async fn require_admin() -> Result<crate::models::Member, ServerFnError> {
         .await?
         .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
 
-    if !member.role.is_admin() {
+    if member.role != crate::models::MemberRole::Admin {
         return Err(ServerFnError::new("Administrator access required"));
     }
 
