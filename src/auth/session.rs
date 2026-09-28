@@ -13,6 +13,23 @@ pub fn cookie_name() -> &'static str {
     COOKIE_NAME
 }
 
+#[cfg(feature = "ssr")]
+pub(super) async fn member_from_session(
+    pool: &sqlx::PgPool,
+    cookies: &axum_extra::extract::CookieJar,
+) -> Result<Option<crate::models::Member>, ServerFnError> {
+    let Some(cookie) = cookies.get(cookie_name()) else {
+        return Ok(None);
+    };
+    let Some(member_id) = verify_session_value(cookie.value()) else {
+        return Ok(None);
+    };
+
+    crate::models::Member::find_active_by_id(pool, member_id)
+        .await
+        .map_err(|error| ServerFnError::new(error.to_string()))
+}
+
 fn session_secret() -> String {
     std::env::var("SESSION_SECRET").unwrap_or_else(|_| {
         tracing::warn!("SESSION_SECRET not set; using insecure default for development");
@@ -54,28 +71,22 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 #[cfg(feature = "ssr")]
-pub async fn require_admin() -> Result<(sqlx::PgPool, Uuid), ServerFnError> {
+pub async fn require_admin() -> Result<crate::models::Member, ServerFnError> {
     use axum_extra::extract::CookieJar;
     use leptos_axum::extract;
 
-    let pool = expect_context::<crate::state::AppState>().pool;
     let cookies: CookieJar = extract().await?;
-    let cookie = cookies
-        .get(crate::auth::session::cookie_name())
-        .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
-    let admin_id = crate::auth::session::verify_session_value(cookie.value())
-        .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
-
-    let member = crate::models::Member::find_active_by_id(&pool, admin_id)
-        .await
-        .map_err(|error| ServerFnError::new(error.to_string()))?
+    let app_state = expect_context::<crate::state::AppState>();
+    let pool = &app_state.pool;
+    let member = member_from_session(pool, &cookies)
+        .await?
         .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
 
     if !member.role.is_admin() {
         return Err(ServerFnError::new("Administrator access required"));
     }
 
-    Ok((pool, admin_id))
+    Ok(member)
 }
 
 #[cfg(test)]

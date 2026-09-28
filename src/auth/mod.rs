@@ -62,18 +62,7 @@ pub async fn current_member() -> Result<Option<Member>, ServerFnError> {
 
     let pool = expect_context::<crate::state::AppState>().pool;
     let jar: CookieJar = extract().await?;
-    let Some(cookie) = jar.get(session::cookie_name()) else {
-        return Ok(None);
-    };
-    let Some(member_id) = session::verify_session_value(cookie.value()) else {
-        return Ok(None);
-    };
-
-    let member = crate::models::Member::find_active_by_id(&pool, member_id)
-        .await
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
-
-    Ok(member)
+    session::member_from_session(&pool, &jar).await
 }
 
 /// Clears the session cookie.

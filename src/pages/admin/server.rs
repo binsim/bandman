@@ -5,7 +5,8 @@ use uuid::Uuid;
 /// Lists all band members for an administrator.
 #[server(AdminListMembers, "/api")]
 pub(super) async fn admin_list_members() -> Result<Vec<Member>, ServerFnError> {
-    let (pool, _) = crate::auth::session::require_admin().await?;
+    crate::auth::session::require_admin().await?;
+    let pool = expect_context::<crate::state::AppState>().pool;
     Member::list_all(&pool)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))
@@ -17,7 +18,8 @@ pub(super) async fn admin_update_member_name(
     member_id: Uuid,
     name: String,
 ) -> Result<Member, ServerFnError> {
-    let (pool, _) = crate::auth::session::require_admin().await?;
+    crate::auth::session::require_admin().await?;
+    let pool = expect_context::<crate::state::AppState>().pool;
     let mut member = Member::find_by_id(&pool, member_id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))?
@@ -35,7 +37,8 @@ pub(super) async fn admin_update_member_role(
     member_id: Uuid,
     role: MemberRole,
 ) -> Result<Member, ServerFnError> {
-    let (pool, _) = crate::auth::session::require_admin().await?;
+    crate::auth::session::require_admin().await?;
+    let pool = expect_context::<crate::state::AppState>().pool;
     let mut member = Member::find_by_id(&pool, member_id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))?
@@ -53,7 +56,8 @@ pub(super) async fn admin_set_member_active(
     member_id: Uuid,
     active: bool,
 ) -> Result<Member, ServerFnError> {
-    let (pool, _) = crate::auth::session::require_admin().await?;
+    crate::auth::session::require_admin().await?;
+    let pool = expect_context::<crate::state::AppState>().pool;
     let mut member = Member::find_by_id(&pool, member_id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))?
@@ -68,10 +72,11 @@ pub(super) async fn admin_set_member_active(
 /// Permanently deletes a member.
 #[server(AdminDeleteMember, "/api")]
 pub(super) async fn admin_delete_member(member_id: Uuid) -> Result<(), ServerFnError> {
-    let (pool, admin_id) = crate::auth::session::require_admin().await?;
-    if admin_id == member_id {
+    let admin = crate::auth::session::require_admin().await?;
+    if admin.id == member_id {
         return Err(ServerFnError::new("You cannot delete your own account"));
     }
+    let pool = expect_context::<crate::state::AppState>().pool;
     Member::delete(&pool, member_id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))
