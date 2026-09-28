@@ -109,15 +109,12 @@ test.describe("Admin member management", () => {
       `${nameInputHeight}px`,
     );
     await expect(memberRow.getByTestId("admin-save-member")).toBeDisabled();
-    await expect(
-      memberRow.getByTestId("admin-save-member-role"),
-    ).toBeDisabled();
     await expect(memberRow.getByTestId("admin-reset-member")).toBeDisabled();
 
     const roleSelectHeight = await memberRow
       .locator("select")
       .evaluate((element) => element.getBoundingClientRect().height);
-    await expect(memberRow.getByTestId("admin-save-member-role")).toHaveCSS(
+    await expect(memberRow.getByTestId("admin-save-member")).toHaveCSS(
       "height",
       `${roleSelectHeight}px`,
     );
@@ -135,9 +132,22 @@ test.describe("Admin member management", () => {
     );
     await expect(memberRow.locator("select")).toHaveValue("member");
     await expect(memberRow.getByTestId("admin-save-member")).toBeDisabled();
-    await expect(
-      memberRow.getByTestId("admin-save-member-role"),
-    ).toBeDisabled();
+    await expect(memberRow.getByTestId("admin-reset-member")).toBeDisabled();
+
+    const nameInput = memberRow.getByTestId("admin-member-name-input");
+    const roleSelect = memberRow.locator("select");
+    await nameInput.fill(`${memberName} Draft`);
+    await roleSelect.selectOption("participant");
+    await memberRow.getByTestId("admin-toggle-active").click();
+    await expect(memberRow.getByTestId("admin-save-member")).toBeEnabled();
+    await expect(memberRow.getByTestId("admin-reset-member")).toBeEnabled();
+
+    await nameInput.fill(memberName);
+    await roleSelect.selectOption("member");
+    await memberRow.getByTestId("admin-toggle-active").click();
+    await expect(memberRow.getByTestId("admin-save-member")).toBeDisabled();
+    await expect(memberRow.getByTestId("admin-reset-member")).toBeDisabled();
+
     await memberRow.locator("select").selectOption("participant");
 
     await memberRow
@@ -145,6 +155,7 @@ test.describe("Admin member management", () => {
       .fill(`${memberName} Draft`);
     await memberRow.getByTestId("admin-toggle-active").click();
     await expect(memberRow).toContainText("Inactive");
+    await expect(memberRow.getByTestId("admin-save-member")).toBeEnabled();
     await expect(memberRow.getByTestId("admin-member-name-input")).toHaveValue(
       `${memberName} Draft`,
     );
@@ -154,14 +165,27 @@ test.describe("Admin member management", () => {
       memberId,
     );
     await memberRow.getByTestId("admin-reset-member").click();
+    await expect(memberRow).toContainText("Active");
     await memberRow.getByTestId("admin-toggle-active").click();
+    await memberRow.getByTestId("admin-save-member").click();
+    await expect(memberRow).toContainText("Inactive");
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(memberRow).toContainText("Inactive");
+    await memberRow.getByTestId("admin-toggle-active").click();
+    await memberRow.getByTestId("admin-reset-member").click();
+    await expect(memberRow).toContainText("Inactive");
+    await memberRow.getByTestId("admin-toggle-active").click();
+    await memberRow.getByTestId("admin-save-member").click();
     await expect(memberRow).toContainText("Active");
 
     const renamedMember = `ZZZ E2E Participant ${Date.now()} Renamed`;
     await memberRow.getByTestId("admin-member-name-input").fill(renamedMember);
+    await memberRow.locator("select").selectOption("participant");
     await memberRow.getByTestId("admin-save-member").click();
     const renamedRow = page.locator(`[data-member-name="${renamedMember}"]`);
     await expect(renamedRow).toBeVisible();
+    await expect(renamedRow.locator("select")).toHaveValue("participant");
+    await expect(renamedRow.getByTestId("admin-row-error")).toHaveCount(0);
     await expect
       .poll(async () => {
         const rowNames = await page
@@ -172,13 +196,9 @@ test.describe("Admin member management", () => {
         return rowNames.indexOf("Admin") < rowNames.indexOf(renamedMember);
       })
       .toBe(true);
-    await memberRow.locator("select").selectOption("participant");
-    await renamedRow.getByTestId("admin-save-member-role").click();
-    await expect(renamedRow.locator("select")).toHaveValue("participant");
-    await expect(renamedRow.getByTestId("admin-row-error")).toHaveCount(0);
 
     await adminRow.locator("select").selectOption("member");
-    await adminRow.getByTestId("admin-save-member-role").click();
+    await adminRow.getByTestId("admin-save-member").click();
     await expect(adminRow.getByTestId("admin-row-error")).toContainText(
       "At least one active admin must remain",
     );
@@ -187,6 +207,8 @@ test.describe("Admin member management", () => {
     await expect(adminRow.locator("select")).toHaveValue("admin");
     await expect(adminRow).toContainText("Active");
     await adminRow.getByTestId("admin-toggle-active").click();
+    await expect(adminRow).toContainText("Inactive");
+    await adminRow.getByTestId("admin-save-member").click();
     await expect(adminRow.getByTestId("admin-row-error")).toContainText(
       "At least one active admin must remain",
     );
