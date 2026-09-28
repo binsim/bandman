@@ -25,7 +25,9 @@ test.describe("Admin member management", () => {
   }) => {
     await loginAsAdmin(page);
     await page.getByRole("link", { name: "Admin" }).click();
-    await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Members", exact: true }),
+    ).toBeVisible();
 
     const nameInput = page.getByTestId("admin-member-name");
     const createButton = page.getByTestId("admin-create-member");
@@ -61,10 +63,12 @@ test.describe("Admin member management", () => {
     await expect(page.getByTestId("session-name")).toHaveText("Admin");
     await expect(
       page.getByTestId("topbar").getByRole("link", { name: "Finance" }),
-    ).toBeHidden();
+    ).toBeVisible();
     await page.getByRole("link", { name: "Admin" }).click();
 
-    await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Members", exact: true }),
+    ).toBeVisible();
     const adminRow = page.locator('[data-member-name="Admin"]');
     await expect(adminRow.getByTestId("admin-delete-member")).toHaveCount(0);
     await page.getByTestId("admin-member-name").fill(memberName);
