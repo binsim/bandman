@@ -1,7 +1,7 @@
 use crate::auth::{current_member, logout};
 use crate::components::language::LanguageSwitcher;
 use crate::components::theme::ThemeToggle;
-use crate::models::MemberSummary;
+use crate::models::{Member, MemberRole};
 use leptos::prelude::*;
 use leptos_fluent::tr;
 use leptos_router::components::A;
@@ -15,6 +15,7 @@ pub fn AppShell(children: Children) -> impl IntoView {
         move || auth_revision.get(),
         |_| async move { current_member().await.ok().flatten() },
     );
+    provide_context(member);
 
     view! {
         <div class="app-shell">
@@ -23,13 +24,28 @@ pub fn AppShell(children: Children) -> impl IntoView {
                     <span class="brand-mark">"♪"</span>
                     <span class="brand-name" data-testid="brand-name">"Bandman"</span>
                 </A>
-                <nav class="topbar-nav" aria-label="Main">
-                    <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
-                    <A href="/program">{move || tr!("nav-program")}</A>
-                    <A href="/plan">{move || tr!("nav-plan")}</A>
-                    <A href="/finance">{move || tr!("nav-finance")}</A>
-                    <A href="/admin">{move || tr!("nav-admin")}</A>
-                </nav>
+                <Suspense fallback=|| ()>
+                    {move || match member.get() {
+                        Some(Some(m)) => view! {
+                            <nav class="topbar-nav" aria-label="Main">
+                                <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
+                                <A href="/plan">{move || tr!("nav-plan")}</A>
+                                {if m.role == MemberRole::Participant || m.role == MemberRole::Admin {
+                                    view! { <A href="/finance">{move || tr!("nav-finance")}</A> }.into_any()
+                                } else {
+                                    ().into_any()
+                                }}
+                                {if m.role == MemberRole::Admin {
+                                    view! { <A href="/admin">{move || tr!("nav-admin")}</A> }.into_any()
+                                } else {
+                                    ().into_any()
+                                }}
+                            </nav>
+                        }
+                        .into_any(),
+                        _ => ().into_any(),
+                    }}
+                </Suspense>
                 <div class="topbar-actions">
                     <LanguageSwitcher />
                     <ThemeToggle />
@@ -54,7 +70,7 @@ pub fn AppShell(children: Children) -> impl IntoView {
 }
 
 #[component]
-fn LoggedInControls(member: MemberSummary) -> impl IntoView {
+fn LoggedInControls(member: Member) -> impl IntoView {
     let name = member.name.clone();
     let auth_revision = expect_context::<RwSignal<u64>>();
     let logout_action = Action::new(move |_| {

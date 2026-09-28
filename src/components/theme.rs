@@ -1,7 +1,7 @@
 use leptos::prelude::*;
 use leptos_meta::Html;
 
-#[allow(dead_code)]
+#[cfg(feature = "hydrate")]
 const STORAGE_KEY: &str = "bandman-theme";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -39,8 +39,7 @@ pub struct ThemeCtx {
 }
 
 pub fn provide_theme() -> ThemeCtx {
-    let initial = initial_theme();
-    let theme = RwSignal::new(initial);
+    let theme = RwSignal::new(initial_theme());
     let ctx = ThemeCtx { theme };
     provide_context(ctx);
 

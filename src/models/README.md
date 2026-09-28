@@ -1,2 +1,2 @@
-# Member model & migrations — types live here for shared SSR/hydrate use.
+# Member model & migrations — database operations run on the server; serializable types are shared with the UI.
 # See ../pages/*/README.md for feature plans.

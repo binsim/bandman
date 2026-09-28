@@ -8,7 +8,6 @@ async fn main() {
     use leptos::logging::log;
     use leptos::prelude::*;
     use leptos_axum::{generate_route_list, LeptosRoutes};
-    use sqlx::PgPool;
 
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
@@ -34,18 +33,10 @@ async fn main() {
     let routes = generate_route_list(App);
 
     let app = Router::new()
-        .leptos_routes_with_context(
-            &state,
-            routes,
-            {
-                let pool = pool.clone();
-                move || provide_context::<PgPool>(pool.clone())
-            },
-            {
-                let leptos_options = leptos_options.clone();
-                move || shell(leptos_options.clone())
-            },
-        )
+        .leptos_routes(&state, routes, {
+            let leptos_options = leptos_options.clone();
+            move || shell(leptos_options.clone())
+        })
         .fallback(leptos_axum::file_and_error_handler::<AppState, _>(shell))
         .with_state(state);
 

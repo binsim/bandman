@@ -1,6 +1,7 @@
 //! Signed session cookie helpers (SSR).
 
 use hmac::{Hmac, Mac};
+use leptos::prelude::*;
 use sha2::Sha256;
 use uuid::Uuid;
 
@@ -10,6 +11,23 @@ const COOKIE_NAME: &str = "bandman_session";
 
 pub fn cookie_name() -> &'static str {
     COOKIE_NAME
+}
+
+#[cfg(feature = "ssr")]
+pub(super) async fn member_from_session(
+    pool: &sqlx::PgPool,
+    cookies: &axum_extra::extract::CookieJar,
+) -> Result<Option<crate::models::Member>, ServerFnError> {
+    let Some(cookie) = cookies.get(cookie_name()) else {
+        return Ok(None);
+    };
+    let Some(member_id) = verify_session_value(cookie.value()) else {
+        return Ok(None);
+    };
+
+    crate::models::Member::find_active_by_id(pool, member_id)
+        .await
+        .map_err(|error| ServerFnError::new(error.to_string()))
 }
 
 fn session_secret() -> String {
@@ -52,6 +70,25 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
         == 0
 }
 
+#[cfg(feature = "ssr")]
+pub async fn require_admin() -> Result<crate::models::Member, ServerFnError> {
+    use axum_extra::extract::CookieJar;
+    use leptos_axum::extract;
+
+    let cookies: CookieJar = extract().await?;
+    let app_state = expect_context::<crate::state::AppState>();
+    let pool = &app_state.pool;
+    let member = member_from_session(pool, &cookies)
+        .await?
+        .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
+
+    if member.role != crate::models::MemberRole::Admin {
+        return Err(ServerFnError::new("Administrator access required"));
+    }
+
+    Ok(member)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -69,7 +106,11 @@ mod tests {
         std::env::set_var("SESSION_SECRET", "unit-test-secret");
         let id = Uuid::new_v4();
         let signed = sign_member_id(id);
-        let tampered = format!("{signed}x");
+        let (signed_id, signature) = signed.split_once('.').unwrap();
+        let mut tampered_signature = signature.to_string();
+        let last = tampered_signature.pop().unwrap();
+        tampered_signature.push(if last == '0' { '1' } else { '0' });
+        let tampered = format!("{signed_id}.{tampered_signature}");
         assert_eq!(verify_session_value(&tampered), None);
     }
 

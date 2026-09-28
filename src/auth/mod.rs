@@ -1,43 +1,39 @@
 //! Authentication: name-based login and session cookies.
 
 #[cfg(feature = "ssr")]
-mod members_repo;
-#[cfg(feature = "ssr")]
-mod session;
+pub(crate) mod session;
 
-use crate::models::MemberSummary;
+use crate::models::Member;
 use leptos::prelude::*;
 
 /// Lists active members for the login picker.
 #[server(ListMembers, "/api")]
-pub async fn list_members() -> Result<Vec<MemberSummary>, ServerFnError> {
-    use sqlx::PgPool;
-
-    let pool = expect_context::<PgPool>();
-    members_repo::list_active_members(&pool)
+pub async fn list_members() -> Result<Vec<Member>, ServerFnError> {
+    let pool = expect_context::<crate::state::AppState>().pool;
+    crate::models::Member::list_active(&pool)
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))
 }
 
 /// Logs in as the member with the given display name.
 #[server(LoginAsMember, "/api")]
-pub async fn login_as_member(name: String) -> Result<MemberSummary, ServerFnError> {
+pub async fn login_as_member(name: String) -> Result<Member, ServerFnError> {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use leptos_axum::ResponseOptions;
-    use sqlx::PgPool;
 
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(ServerFnError::new("Name is required"));
     }
 
-    let pool = expect_context::<PgPool>();
-    let member = members_repo::find_active_by_name(&pool, &name)
+    let pool = expect_context::<crate::state::AppState>().pool;
+    let member = crate::models::Member::find_active_by_name(&pool, &name)
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?
         .ok_or_else(|| ServerFnError::new("Member not found"))?;
 
-    members_repo::touch_last_login(&pool, member.id)
+    let member = member
+        .update_last_login(&pool)
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?;
 
@@ -55,30 +51,18 @@ pub async fn login_as_member(name: String) -> Result<MemberSummary, ServerFnErro
             .map_err(|e| ServerFnError::new(e.to_string()))?,
     );
 
-    Ok(MemberSummary::from(member))
+    Ok(member)
 }
 
 /// Returns the currently logged-in member, if any.
 #[server(CurrentMember, "/api")]
-pub async fn current_member() -> Result<Option<MemberSummary>, ServerFnError> {
+pub async fn current_member() -> Result<Option<Member>, ServerFnError> {
     use axum_extra::extract::CookieJar;
     use leptos_axum::extract;
-    use sqlx::PgPool;
 
+    let pool = expect_context::<crate::state::AppState>().pool;
     let jar: CookieJar = extract().await?;
-    let Some(cookie) = jar.get(session::cookie_name()) else {
-        return Ok(None);
-    };
-    let Some(member_id) = session::verify_session_value(cookie.value()) else {
-        return Ok(None);
-    };
-
-    let pool = expect_context::<PgPool>();
-    let member = members_repo::find_active_by_id(&pool, member_id)
-        .await
-        .map_err(|e| ServerFnError::new(e.to_string()))?;
-
-    Ok(member.map(MemberSummary::from))
+    session::member_from_session(&pool, &jar).await
 }
 
 /// Clears the session cookie.
