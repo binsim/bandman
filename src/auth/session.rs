@@ -95,7 +95,11 @@ mod tests {
         std::env::set_var("SESSION_SECRET", "unit-test-secret");
         let id = Uuid::new_v4();
         let signed = sign_member_id(id);
-        let tampered = format!("{signed}x");
+        let (signed_id, signature) = signed.split_once('.').unwrap();
+        let mut tampered_signature = signature.to_string();
+        let last = tampered_signature.pop().unwrap();
+        tampered_signature.push(if last == '0' { '1' } else { '0' });
+        let tampered = format!("{signed_id}.{tampered_signature}");
         assert_eq!(verify_session_value(&tampered), None);
     }
 

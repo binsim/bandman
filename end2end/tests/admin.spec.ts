@@ -1,7 +1,53 @@
 import { expect, test } from "@playwright/test";
 import { gotoHydrated } from "./helpers";
 
+async function loginAsAdmin(page: Parameters<typeof gotoHydrated>[0]) {
+  await gotoHydrated(page, "/login");
+  await page
+    .getByTestId("login-member-select")
+    .selectOption({ label: "Admin" });
+  await page.getByTestId("login-submit").click();
+  await expect(page.getByTestId("session-name")).toHaveText("Admin");
+}
+
 test.describe("Admin member management", () => {
+  test("denies access when signed out", async ({ page }) => {
+    await gotoHydrated(page, "/admin");
+
+    await expect(page.getByTestId("admin-access-denied")).toBeVisible();
+    await expect(
+      page.getByTestId("topbar").getByRole("link", { name: /log in/i }),
+    ).toBeVisible();
+  });
+
+  test("validates new member names and rejects case-insensitive duplicates", async ({
+    page,
+  }) => {
+    await loginAsAdmin(page);
+    await page.getByRole("link", { name: "Admin" }).click();
+    await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
+
+    const nameInput = page.getByTestId("admin-member-name");
+    const createButton = page.getByTestId("admin-create-member");
+    await expect(nameInput).toHaveAttribute("required", "");
+    expect(
+      await nameInput.evaluate((input) =>
+        (input as HTMLInputElement).checkValidity(),
+      ),
+    ).toBe(false);
+    await createButton.click();
+    await expect(page.getByTestId("admin-create-error")).toHaveCount(0);
+
+    await nameInput.fill("admin");
+    await page.getByTestId("admin-member-role").selectOption("member");
+    await createButton.click();
+
+    await expect(page.getByTestId("admin-create-error")).toContainText(
+      "A member with this name already exists",
+    );
+    await expect(page.locator('[data-member-name="Admin"]')).toHaveCount(1);
+  });
+
   test("creates members, updates access, and preserves an active admin", async ({
     page,
   }) => {
@@ -19,6 +65,8 @@ test.describe("Admin member management", () => {
     await page.getByRole("link", { name: "Admin" }).click();
 
     await expect(page.getByRole("heading", { name: "Members" })).toBeVisible();
+    const adminRow = page.locator('[data-member-name="Admin"]');
+    await expect(adminRow.getByTestId("admin-delete-member")).toHaveCount(0);
     await page.getByTestId("admin-member-name").fill(memberName);
     await page.getByTestId("admin-member-role").selectOption("member");
     const createNameInputHeight = await page
@@ -32,6 +80,15 @@ test.describe("Admin member management", () => {
 
     const createdMemberRow = page.locator(`[data-member-name="${memberName}"]`);
     await expect(createdMemberRow).toBeVisible();
+    await expect(adminRow).toBeVisible();
+    const rowNamesAfterCreate = await page
+      .getByTestId("admin-member-row")
+      .evaluateAll((rows) =>
+        rows.map((row) => row.getAttribute("data-member-name")),
+      );
+    expect(rowNamesAfterCreate.indexOf(memberName)).toBeLessThan(
+      rowNamesAfterCreate.indexOf("Admin"),
+    );
     const memberId = await createdMemberRow.getAttribute("data-member-id");
     if (!memberId) {
       throw new Error("Created member row is missing its stable member ID");
@@ -94,17 +151,33 @@ test.describe("Admin member management", () => {
     await memberRow.getByTestId("admin-toggle-active").click();
     await expect(memberRow).toContainText("Active");
 
-    const renamedMember = `${memberName} Renamed`;
+    const renamedMember = `ZZZ E2E Participant ${Date.now()} Renamed`;
     await memberRow.getByTestId("admin-member-name-input").fill(renamedMember);
     await memberRow.getByTestId("admin-save-member").click();
     const renamedRow = page.locator(`[data-member-name="${renamedMember}"]`);
     await expect(renamedRow).toBeVisible();
+    const rowNamesAfterRename = await page
+      .getByTestId("admin-member-row")
+      .evaluateAll((rows) =>
+        rows.map((row) => row.getAttribute("data-member-name")),
+      );
+    expect(rowNamesAfterRename.indexOf("Admin")).toBeLessThan(
+      rowNamesAfterRename.indexOf(renamedMember),
+    );
     await memberRow.locator("select").selectOption("participant");
     await renamedRow.getByTestId("admin-save-member-role").click();
     await expect(renamedRow.locator("select")).toHaveValue("participant");
     await expect(renamedRow.getByTestId("admin-row-error")).toHaveCount(0);
 
-    const adminRow = page.locator('[data-member-name="Admin"]');
+    await adminRow.locator("select").selectOption("member");
+    await adminRow.getByTestId("admin-save-member-role").click();
+    await expect(adminRow.getByTestId("admin-row-error")).toContainText(
+      "At least one active admin must remain",
+    );
+    await adminRow.getByTestId("admin-reset-member").click();
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(adminRow.locator("select")).toHaveValue("admin");
+    await expect(adminRow).toContainText("Active");
     await adminRow.getByTestId("admin-toggle-active").click();
     await expect(adminRow.getByTestId("admin-row-error")).toContainText(
       "At least one active admin must remain",

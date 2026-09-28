@@ -6,7 +6,7 @@ Browser tests for critical server-rendered and hydrated flows.
 
 - Server-rendered home page and member login
 - Theme and language controls
-- Admin member management
+- Admin access, member validation and CRUD, last-admin protections, sorting, and delete confirmation
 
 ## Run locally
 

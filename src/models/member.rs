@@ -506,4 +506,137 @@ mod tests {
             Err(MemberError::LastActiveAdmin)
         ));
     }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn database_member_updates_reject_duplicates_and_missing_members(pool: PgPool) {
+        let first_name = format!("Member first {}", Uuid::new_v4());
+        let second_name = format!("Member second {}", Uuid::new_v4());
+        let mut first = Member::create(&pool, &first_name, MemberRole::Member)
+            .await
+            .expect("first member should be created");
+        let second = Member::create(&pool, &second_name, MemberRole::Member)
+            .await
+            .expect("second member should be created");
+
+        assert!(matches!(
+            Member::create(&pool, "  ", MemberRole::Member).await,
+            Err(MemberError::InvalidName)
+        ));
+        assert!(matches!(
+            first.update_name(&pool, "  ").await,
+            Err(MemberError::InvalidName)
+        ));
+        assert!(matches!(
+            first.update_name(&pool, &second_name.to_uppercase()).await,
+            Err(MemberError::DuplicateName)
+        ));
+
+        let unchanged = Member::find_by_id(&pool, first.id)
+            .await
+            .expect("member query should succeed")
+            .expect("first member should still exist");
+        assert_eq!(unchanged.name, first_name);
+
+        Member::delete(&pool, first.id)
+            .await
+            .expect("first member should be deleted");
+        assert!(matches!(
+            first.update_name(&pool, "Renamed").await,
+            Err(MemberError::NotFound)
+        ));
+        assert!(matches!(
+            first.update_role(&pool, MemberRole::Participant).await,
+            Err(MemberError::NotFound)
+        ));
+        assert!(matches!(
+            first.set_active(&pool, false).await,
+            Err(MemberError::NotFound)
+        ));
+        assert!(matches!(
+            Member::delete(&pool, first.id).await,
+            Err(MemberError::NotFound)
+        ));
+
+        Member::delete(&pool, second.id)
+            .await
+            .expect("second member should be deleted");
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn database_member_queries_respect_active_status_and_update_login(pool: PgPool) {
+        let name = format!("Member queries {}", Uuid::new_v4());
+        let mut member = Member::create(&pool, &name, MemberRole::Participant)
+            .await
+            .expect("member should be created");
+        assert!(member.last_login.is_none());
+
+        let updated = member
+            .update_last_login(&pool)
+            .await
+            .expect("last login should update");
+        assert!(updated.last_login.is_some());
+
+        member
+            .set_active(&pool, false)
+            .await
+            .expect("member should deactivate");
+        assert!(Member::find_active_by_id(&pool, member.id)
+            .await
+            .expect("active member lookup should succeed")
+            .is_none());
+        assert!(Member::find_active_by_name(&pool, &name)
+            .await
+            .expect("active name lookup should succeed")
+            .is_none());
+        assert!(
+            !Member::find_by_id(&pool, member.id)
+                .await
+                .expect("member lookup should succeed")
+                .expect("inactive member should remain queryable")
+                .active
+        );
+        assert!(Member::list_active(&pool)
+            .await
+            .expect("active member list should succeed")
+            .iter()
+            .all(|listed| listed.id != member.id));
+        assert!(Member::list_all(&pool)
+            .await
+            .expect("all member list should succeed")
+            .iter()
+            .any(|listed| listed.id == member.id && !listed.active));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn database_allows_admin_changes_when_another_active_admin_remains(pool: PgPool) {
+        let name = format!("Second admin {}", Uuid::new_v4());
+        let mut admin = Member::create(&pool, &name, MemberRole::Admin)
+            .await
+            .expect("second admin should be created");
+
+        admin
+            .update_role(&pool, MemberRole::Member)
+            .await
+            .expect("one of multiple admins should be demoted");
+        admin
+            .update_role(&pool, MemberRole::Admin)
+            .await
+            .expect("member should be promotable to admin");
+        admin
+            .set_active(&pool, false)
+            .await
+            .expect("one of multiple admins should be deactivated");
+        admin
+            .set_active(&pool, true)
+            .await
+            .expect("admin should be reactivated");
+        Member::delete(&pool, admin.id)
+            .await
+            .expect("one of multiple admins should be deletable");
+
+        assert!(Member::find_active_by_name(&pool, "Admin")
+            .await
+            .expect("seeded admin lookup should succeed")
+            .is_some());
+    }
 }
