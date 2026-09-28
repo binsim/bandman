@@ -1,10 +1,5 @@
 mod create_member;
-mod server;
 
-use self::server::{
-    admin_delete_member, admin_list_members, admin_set_member_active, admin_update_member_name,
-    admin_update_member_role,
-};
 use crate::{
     models::{Member, MemberRole},
     pages::admin::create_member::CreateMemberForm,
@@ -14,6 +9,46 @@ use leptos_fluent::tr;
 use uuid::Uuid;
 
 type MemberFeedback = Option<(Uuid, String)>;
+
+#[server(AdminListMembers, "/api")]
+pub(super) async fn admin_list_members() -> Result<Vec<Member>, ServerFnError> {
+    crate::auth::session::require_admin().await?;
+    let pool = expect_context::<crate::state::AppState>().pool;
+    Member::list_all(&pool)
+        .await
+        .map_err(|error| ServerFnError::new(error.to_string()))
+}
+
+#[server(AdminUpdateMemberDetails, "/api")]
+pub(super) async fn admin_update_member_details(
+    member_id: Uuid,
+    name: String,
+    role: MemberRole,
+    active: bool,
+) -> Result<Member, ServerFnError> {
+    crate::auth::session::require_admin().await?;
+    let pool = expect_context::<crate::state::AppState>().pool;
+    let mut member = Member::find_by_id(&pool, member_id)
+        .await
+        .map_err(|error| ServerFnError::new(error.to_string()))?
+        .ok_or_else(|| ServerFnError::new("Member not found"))?;
+    member
+        .update_details(&pool, &name, role, active)
+        .await
+        .map_err(|error| ServerFnError::new(error.to_string()))?;
+    Ok(member)
+}
+#[server(AdminDeleteMember, "/api")]
+pub(super) async fn admin_delete_member(member_id: Uuid) -> Result<(), ServerFnError> {
+    let admin = crate::auth::session::require_admin().await?;
+    if admin.id == member_id {
+        return Err(ServerFnError::new("You cannot delete your own account"));
+    }
+    let pool = expect_context::<crate::state::AppState>().pool;
+    Member::delete(&pool, member_id)
+        .await
+        .map_err(|error| ServerFnError::new(error.to_string()))
+}
 
 #[component]
 pub fn AdminPage() -> impl IntoView {
@@ -180,46 +215,36 @@ fn MemberRow(
     let name_input = RwSignal::new(member.name.clone());
     let original_name = RwSignal::new(member.name.clone());
     let original_role = RwSignal::new(member.role);
+    let active = RwSignal::new(member.active);
+    let original_active = RwSignal::new(member.active);
     let pending = RwSignal::new(false);
     let confirming_delete = RwSignal::new(false);
     let member_id = member.id;
     let name_dirty = Memo::new(move |_| name_input.get().trim() != original_name.get());
     let role_dirty = Memo::new(move |_| role.get() != original_role.get());
-    let dirty = Memo::new(move |_| name_dirty.get() || role_dirty.get());
+    let active_dirty = Memo::new(move |_| active.get() != original_active.get());
+    let dirty = Memo::new(move |_| name_dirty.get() || role_dirty.get() || active_dirty.get());
     let last_login = member
         .last_login
         .map(|time| time.format("%Y-%m-%d %H:%M UTC").to_string())
         .unwrap_or_else(|| tr!("admin-never"));
     let role_label = move || format!("{}: {}", tr!("admin-role-label"), name_input.get());
-    let active = RwSignal::new(member.active);
-
-    let save_name = Callback::new(move |_| {
+    let save_details = Callback::new(move |_| {
         let name_value = name_input.get();
+        let role_value = role.get();
+        let active_value = active.get();
         pending.set(true);
         feedback.set(None);
         leptos::task::spawn_local(async move {
-            match admin_update_member_name(member_id, name_value).await {
+            match admin_update_member_details(member_id, name_value, role_value, active_value).await
+            {
                 Ok(updated_member) => {
                     name_input.set(updated_member.name.clone());
                     original_name.set(updated_member.name.clone());
-                    feedback.set(None);
-                    on_change.run(updated_member);
-                }
-                Err(error) => feedback.set(Some((member_id, error.to_string()))),
-            }
-            pending.set(false);
-        });
-    });
-
-    let save_role = Callback::new(move |_| {
-        let role_value = role.get();
-        pending.set(true);
-        feedback.set(None);
-        leptos::task::spawn_local(async move {
-            match admin_update_member_role(member_id, role_value).await {
-                Ok(updated_member) => {
                     role.set(updated_member.role);
                     original_role.set(updated_member.role);
+                    active.set(updated_member.active);
+                    original_active.set(updated_member.active);
                     feedback.set(None);
                     on_change.run(updated_member);
                 }
@@ -232,24 +257,8 @@ fn MemberRow(
     let reset_details = Callback::new(move |_| {
         name_input.set(original_name.get_untracked());
         role.set(original_role.get_untracked());
+        active.set(original_active.get_untracked());
         feedback.set(None);
-    });
-
-    let toggle_active = Callback::new(move |_| {
-        pending.set(true);
-        feedback.set(None);
-        let next_active = !active.get_untracked();
-        leptos::task::spawn_local(async move {
-            match admin_set_member_active(member_id, next_active).await {
-                Ok(updated_member) => {
-                    active.set(updated_member.active);
-                    feedback.set(None);
-                    on_change.run(updated_member);
-                }
-                Err(error) => feedback.set(Some((member_id, error.to_string()))),
-            }
-            pending.set(false);
-        });
     });
 
     let delete_member = Callback::new(move |_| {
@@ -309,29 +318,38 @@ fn MemberRow(
                 </div>
             </td>
             <td data-label=move || tr!("admin-column-status")>
-                <span class=move || if active.get() {
-                    "status-badge is-active"
-                } else {
-                    "status-badge"
-                }>
+                <button
+                    class=move || if active.get() {
+                        "status-badge is-active"
+                    } else {
+                        "status-badge"
+                    }
+                    type="button"
+                    data-testid="admin-toggle-active"
+                    aria-label=move || if active.get() {
+                        tr!("admin-deactivate")
+                    } else {
+                        tr!("admin-reactivate")
+                    }
+                    on:click=move |_| {
+                        active.update(|value| *value = !*value);
+                        feedback.set(None);
+                    }
+                    disabled=move || pending.get()
+                >
                     {move || if active.get() { tr!("admin-active") } else { tr!("admin-inactive") }}
-                </span>
+                </button>
             </td>
             <td data-label=move || tr!("admin-column-last-login")>{last_login}</td>
             <td class="admin-actions">
                 <MemberRowActions
-                    active
                     member_name=name_input
                     is_current_member
                     pending
-                    name_dirty
-                    role_dirty
                     dirty
                     confirming_delete
-                    on_save_name=save_name
-                    on_save_role=save_role
+                    on_save=save_details
                     on_reset=reset_details
-                    on_toggle_active=toggle_active
                     on_delete=delete_member
                 />
                 <MemberRowError member_id feedback />
@@ -342,18 +360,13 @@ fn MemberRow(
 
 #[component]
 fn MemberRowActions(
-    active: RwSignal<bool>,
     member_name: RwSignal<String>,
     is_current_member: bool,
     pending: RwSignal<bool>,
-    name_dirty: Memo<bool>,
-    role_dirty: Memo<bool>,
     dirty: Memo<bool>,
     confirming_delete: RwSignal<bool>,
-    on_save_name: Callback<()>,
-    on_save_role: Callback<()>,
+    on_save: Callback<()>,
     on_reset: Callback<()>,
-    on_toggle_active: Callback<()>,
     on_delete: Callback<()>,
 ) -> impl IntoView {
     view! {
@@ -362,19 +375,10 @@ fn MemberRowActions(
                 class="btn btn-ghost btn-sm"
                 type="button"
                 data-testid="admin-save-member"
-                on:click=move |_| on_save_name.run(())
-                disabled=move || pending.get() || !name_dirty.get()
+                on:click=move |_| on_save.run(())
+                disabled=move || pending.get() || !dirty.get()
             >
-                {move || tr!("admin-save-name")}
-            </button>
-            <button
-                class="btn btn-ghost btn-sm"
-                type="button"
-                data-testid="admin-save-member-role"
-                on:click=move |_| on_save_role.run(())
-                disabled=move || pending.get() || !role_dirty.get()
-            >
-                {move || tr!("admin-save-role")}
+                {move || tr!("admin-save-changes")}
             </button>
             <button
                 class="btn btn-ghost btn-sm"
@@ -384,15 +388,6 @@ fn MemberRowActions(
                 disabled=move || pending.get() || !dirty.get()
             >
                 {move || tr!("admin-reset")}
-            </button>
-            <button
-                class="btn btn-ghost btn-sm"
-                type="button"
-                data-testid="admin-toggle-active"
-                on:click=move |_| on_toggle_active.run(())
-                disabled=move || pending.get()
-            >
-                {move || if active.get() { tr!("admin-deactivate") } else { tr!("admin-reactivate") }}
             </button>
             {if is_current_member {
                 ().into_any()

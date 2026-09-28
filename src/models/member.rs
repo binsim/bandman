@@ -175,7 +175,7 @@ impl Member {
             "#,
         )
         .bind(Uuid::new_v4())
-        .bind(name)
+        .bind(&name)
         .bind(role.to_string())
         .fetch_optional(&mut *transaction)
         .await?;
@@ -187,104 +187,57 @@ impl Member {
         Ok(member)
     }
 
-    pub async fn update_name(&mut self, pool: &PgPool, name: &str) -> Result<(), MemberError> {
+    pub async fn update_details(
+        &mut self,
+        pool: &PgPool,
+        name: &str,
+        role: MemberRole,
+        active: bool,
+    ) -> Result<(), MemberError> {
         let name = validate_member_name(name)?;
         let mut transaction = Self::begin_member_mutation(pool).await?;
 
         let member = sqlx::query_as::<_, Member>(
             r#"
             UPDATE members
-            SET name = $1
-            WHERE id = $2
+            SET name = $1, role = $2, active = $3
+            WHERE id = $4
                 AND NOT EXISTS (
                     SELECT 1
                     FROM members
-                    WHERE lower(name) = lower($1) AND id <> $2
+                    WHERE lower(name) = lower($1) AND id <> $4
                 )
-            RETURNING id, name, role, active, created_at, last_login
-            "#,
-        )
-        .bind(name)
-        .bind(self.id)
-        .fetch_optional(&mut *transaction)
-        .await?;
-        let Some(member) = member else {
-            return Err(if Self::member_exists(&mut transaction, self.id).await? {
-                MemberError::DuplicateName
-            } else {
-                MemberError::NotFound
-            });
-        };
-
-        transaction.commit().await?;
-        *self = member;
-        Ok(())
-    }
-
-    pub async fn update_role(
-        &mut self,
-        pool: &PgPool,
-        role: MemberRole,
-    ) -> Result<(), MemberError> {
-        let mut transaction = Self::begin_member_mutation(pool).await?;
-
-        let member = sqlx::query_as::<_, Member>(
-            r#"
-            UPDATE members
-            SET role = $1
-            WHERE id = $2
                 AND (
                     role <> 'admin'
                     OR NOT active
-                    OR $1 = 'admin'
+                    OR ($2 = 'admin' AND $3)
                     OR (SELECT COUNT(*) FROM members WHERE active AND role = 'admin') > 1
                 )
             RETURNING id, name, role, active, created_at, last_login
             "#,
         )
+        .bind(&name)
         .bind(role.to_string())
-        .bind(self.id)
-        .fetch_optional(&mut *transaction)
-        .await?;
-        let Some(member) = member else {
-            return Err(if Self::member_exists(&mut transaction, self.id).await? {
-                MemberError::LastActiveAdmin
-            } else {
-                MemberError::NotFound
-            });
-        };
-
-        transaction.commit().await?;
-        *self = member;
-        Ok(())
-    }
-
-    pub async fn set_active(&mut self, pool: &PgPool, active: bool) -> Result<(), MemberError> {
-        let mut transaction = Self::begin_member_mutation(pool).await?;
-
-        let member = sqlx::query_as::<_, Member>(
-            r#"
-            UPDATE members
-            SET active = $1
-            WHERE id = $2
-                AND (
-                    role <> 'admin'
-                    OR NOT active
-                    OR $1
-                    OR (SELECT COUNT(*) FROM members WHERE active AND role = 'admin') > 1
-                )
-            RETURNING id, name, role, active, created_at, last_login
-            "#,
-        )
         .bind(active)
         .bind(self.id)
         .fetch_optional(&mut *transaction)
         .await?;
         let Some(member) = member else {
-            return Err(if Self::member_exists(&mut transaction, self.id).await? {
-                MemberError::LastActiveAdmin
+            if !Self::member_exists(&mut transaction, self.id).await? {
+                return Err(MemberError::NotFound);
+            }
+
+            let duplicate_name: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM members WHERE lower(name) = lower($1) AND id <> $2)",
+            )
+            .bind(name)
+            .bind(self.id)
+            .fetch_one(&mut *transaction)
+            .await?;
+            return Err(if duplicate_name {
+                MemberError::DuplicateName
             } else {
-                MemberError::NotFound
+                MemberError::LastActiveAdmin
             });
         };
 
@@ -440,15 +393,11 @@ mod tests {
 
         let renamed = format!("{original_name} renamed");
         member
-            .update_name(&pool, &renamed)
+            .update_details(&pool, &renamed, MemberRole::Participant, true)
             .await
-            .expect("member name should update");
+            .expect("member details should update");
         member
-            .update_role(&pool, MemberRole::Participant)
-            .await
-            .expect("member role should update");
-        member
-            .set_active(&pool, false)
+            .update_details(&pool, &renamed, MemberRole::Participant, false)
             .await
             .expect("member should deactivate");
 
@@ -461,7 +410,7 @@ mod tests {
         assert!(!persisted.active);
 
         member
-            .set_active(&pool, true)
+            .update_details(&pool, &renamed, MemberRole::Participant, true)
             .await
             .expect("member should reactivate");
         Member::delete(&pool, member.id)
@@ -477,11 +426,21 @@ mod tests {
             .expect("admin query should succeed")
             .expect("migration should seed an admin");
         assert!(matches!(
-            seeded_admin.update_role(&pool, MemberRole::Member).await,
+            seeded_admin
+                .update_details(&pool, "Renamed admin", MemberRole::Member, true)
+                .await,
             Err(MemberError::LastActiveAdmin)
         ));
+        let persisted_admin = Member::find_by_id(&pool, seeded_admin.id)
+            .await
+            .expect("admin query should succeed")
+            .expect("seeded admin should remain");
+        assert_eq!(persisted_admin.name, "Admin");
+        assert_eq!(persisted_admin.role, MemberRole::Admin);
         assert!(matches!(
-            seeded_admin.set_active(&pool, false).await,
+            seeded_admin
+                .update_details(&pool, "Admin", MemberRole::Admin, false)
+                .await,
             Err(MemberError::LastActiveAdmin)
         ));
         assert!(matches!(
@@ -506,33 +465,36 @@ mod tests {
             Err(MemberError::InvalidName)
         ));
         assert!(matches!(
-            first.update_name(&pool, "  ").await,
+            first
+                .update_details(&pool, "  ", MemberRole::Participant, true)
+                .await,
             Err(MemberError::InvalidName)
         ));
         assert!(matches!(
-            first.update_name(&pool, &second_name.to_uppercase()).await,
+            first
+                .update_details(
+                    &pool,
+                    &second_name.to_uppercase(),
+                    MemberRole::Participant,
+                    true,
+                )
+                .await,
             Err(MemberError::DuplicateName)
         ));
-
         let unchanged = Member::find_by_id(&pool, first.id)
             .await
             .expect("member query should succeed")
             .expect("first member should still exist");
         assert_eq!(unchanged.name, first_name);
+        assert_eq!(unchanged.role, MemberRole::Member);
 
         Member::delete(&pool, first.id)
             .await
             .expect("first member should be deleted");
         assert!(matches!(
-            first.update_name(&pool, "Renamed").await,
-            Err(MemberError::NotFound)
-        ));
-        assert!(matches!(
-            first.update_role(&pool, MemberRole::Participant).await,
-            Err(MemberError::NotFound)
-        ));
-        assert!(matches!(
-            first.set_active(&pool, false).await,
+            first
+                .update_details(&pool, "Renamed", MemberRole::Participant, false)
+                .await,
             Err(MemberError::NotFound)
         ));
         assert!(matches!(
@@ -560,7 +522,7 @@ mod tests {
         assert!(updated.last_login.is_some());
 
         member
-            .set_active(&pool, false)
+            .update_details(&pool, &name, MemberRole::Participant, false)
             .await
             .expect("member should deactivate");
         assert!(Member::find_active_by_id(&pool, member.id)
@@ -598,19 +560,19 @@ mod tests {
             .expect("second admin should be created");
 
         admin
-            .update_role(&pool, MemberRole::Member)
+            .update_details(&pool, &name, MemberRole::Member, true)
             .await
             .expect("one of multiple admins should be demoted");
         admin
-            .update_role(&pool, MemberRole::Admin)
+            .update_details(&pool, &name, MemberRole::Admin, true)
             .await
             .expect("member should be promotable to admin");
         admin
-            .set_active(&pool, false)
+            .update_details(&pool, &name, MemberRole::Admin, false)
             .await
             .expect("one of multiple admins should be deactivated");
         admin
-            .set_active(&pool, true)
+            .update_details(&pool, &name, MemberRole::Admin, true)
             .await
             .expect("admin should be reactivated");
         Member::delete(&pool, admin.id)
