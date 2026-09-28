@@ -387,7 +387,7 @@ fn validate_member_name(name: &str) -> Result<String, MemberError> {
     Ok(name.to_string())
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ssr"))]
 mod tests {
 
     use super::*;
@@ -440,5 +440,70 @@ mod tests {
     fn member_name_accepts_up_to_eighty_characters() {
         let expected = "é".repeat(80);
         assert_eq!(validate_member_name(expected.as_str()).unwrap(), expected);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn database_crud_persists_member_changes(pool: PgPool) {
+        let original_name = format!("Member test {}", Uuid::new_v4());
+        let mut member = Member::create(&pool, &original_name, MemberRole::Member)
+            .await
+            .expect("member should be created");
+
+        assert_eq!(member.name, original_name);
+        assert!(matches!(
+            Member::create(&pool, &original_name.to_uppercase(), MemberRole::Member).await,
+            Err(MemberError::DuplicateName)
+        ));
+
+        let renamed = format!("{original_name} renamed");
+        member
+            .update_name(&pool, &renamed)
+            .await
+            .expect("member name should update");
+        member
+            .update_role(&pool, MemberRole::Participant)
+            .await
+            .expect("member role should update");
+        member
+            .set_active(&pool, false)
+            .await
+            .expect("member should deactivate");
+
+        let persisted = Member::find_by_id(&pool, member.id)
+            .await
+            .expect("member query should succeed")
+            .expect("updated member should exist");
+        assert_eq!(persisted.name, renamed);
+        assert_eq!(persisted.role, MemberRole::Participant);
+        assert!(!persisted.active);
+
+        member
+            .set_active(&pool, true)
+            .await
+            .expect("member should reactivate");
+        Member::delete(&pool, member.id)
+            .await
+            .expect("member should be deleted");
+        assert!(Member::find_by_id(&pool, member.id)
+            .await
+            .expect("member query should succeed")
+            .is_none());
+
+        let mut seeded_admin = Member::find_active_by_name(&pool, "Admin")
+            .await
+            .expect("admin query should succeed")
+            .expect("migration should seed an admin");
+        assert!(matches!(
+            seeded_admin.update_role(&pool, MemberRole::Member).await,
+            Err(MemberError::LastActiveAdmin)
+        ));
+        assert!(matches!(
+            seeded_admin.set_active(&pool, false).await,
+            Err(MemberError::LastActiveAdmin)
+        ));
+        assert!(matches!(
+            Member::delete(&pool, seeded_admin.id).await,
+            Err(MemberError::LastActiveAdmin)
+        ));
     }
 }

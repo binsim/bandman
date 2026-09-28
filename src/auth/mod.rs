@@ -9,9 +9,7 @@ use leptos::prelude::*;
 /// Lists active members for the login picker.
 #[server(ListMembers, "/api")]
 pub async fn list_members() -> Result<Vec<Member>, ServerFnError> {
-    use sqlx::PgPool;
-
-    let pool = expect_context::<PgPool>();
+    let pool = expect_context::<crate::state::AppState>().pool;
     crate::models::Member::list_active(&pool)
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))
@@ -22,14 +20,13 @@ pub async fn list_members() -> Result<Vec<Member>, ServerFnError> {
 pub async fn login_as_member(name: String) -> Result<Member, ServerFnError> {
     use axum_extra::extract::cookie::{Cookie, SameSite};
     use leptos_axum::ResponseOptions;
-    use sqlx::PgPool;
 
     let name = name.trim().to_string();
     if name.is_empty() {
         return Err(ServerFnError::new("Name is required"));
     }
 
-    let pool = expect_context::<PgPool>();
+    let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::models::Member::find_active_by_name(&pool, &name)
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?
@@ -62,8 +59,8 @@ pub async fn login_as_member(name: String) -> Result<Member, ServerFnError> {
 pub async fn current_member() -> Result<Option<Member>, ServerFnError> {
     use axum_extra::extract::CookieJar;
     use leptos_axum::extract;
-    use sqlx::PgPool;
 
+    let pool = expect_context::<crate::state::AppState>().pool;
     let jar: CookieJar = extract().await?;
     let Some(cookie) = jar.get(session::cookie_name()) else {
         return Ok(None);
@@ -72,7 +69,6 @@ pub async fn current_member() -> Result<Option<Member>, ServerFnError> {
         return Ok(None);
     };
 
-    let pool = expect_context::<PgPool>();
     let member = crate::models::Member::find_active_by_id(&pool, member_id)
         .await
         .map_err(|e| ServerFnError::new(e.to_string()))?;

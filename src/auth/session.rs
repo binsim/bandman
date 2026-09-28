@@ -57,8 +57,8 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 pub async fn require_admin() -> Result<(sqlx::PgPool, Uuid), ServerFnError> {
     use axum_extra::extract::CookieJar;
     use leptos_axum::extract;
-    use sqlx::PgPool;
 
+    let pool = expect_context::<crate::state::AppState>().pool;
     let cookies: CookieJar = extract().await?;
     let cookie = cookies
         .get(crate::auth::session::cookie_name())
@@ -66,7 +66,6 @@ pub async fn require_admin() -> Result<(sqlx::PgPool, Uuid), ServerFnError> {
     let admin_id = crate::auth::session::verify_session_value(cookie.value())
         .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
 
-    let pool = expect_context::<PgPool>();
     let member = crate::models::Member::find_active_by_id(&pool, admin_id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))?

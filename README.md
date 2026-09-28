@@ -15,9 +15,9 @@
 - Docker (for Postgres)
 
 ```bash
+npm install --global sass@1.105.0
 rustup target add wasm32-unknown-unknown
 cargo install cargo-leptos --locked
-# optional: npm i -g sass
 ```
 
 ### Database
@@ -33,7 +33,9 @@ cp .env.example .env
 cargo leptos watch
 ```
 
-Open [http://127.0.0.1:3000](http://127.0.0.1:3000). Log in as **Admin** (seeded by migration).
+The app server-renders each page and hydrates it in the browser, so forms and controls
+remain interactive. Open [http://127.0.0.1:3000](http://127.0.0.1:3000) and log in as
+**Admin** (seeded by migration).
 
 ### Full stack in Docker
 
