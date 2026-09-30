@@ -1,24 +1,22 @@
 import { expect, Locator, Page, test } from "@playwright/test";
-import { gotoHydrated } from "./helpers";
+import { gotoHydrated, isArraySorted, loginAsAdmin } from "./helpers";
 import { randomUUID } from "node:crypto";
 
-function isArraySorted(arr: string[]): boolean {
-  for (let i = 0; i < arr.length - 1; i++) {
-    if (arr[i].localeCompare(arr[i + 1]) > 0) {
-      return false; // Found an element that is greater than the next one
-    }
-  }
-  return true; // All elements are in order
-}
+const ADD_MEMBER_NAME_INPUT = "admin-member-name";
+const ADD_MEMBER_ROLE_SELECT = "admin-member-role";
+const ADD_MEMBER_CREATE_BUTTON = "admin-create-member";
+const ADD_MEMBER_ERROR = "admin-member-error";
 
-async function loginAsAdmin(page: Parameters<typeof gotoHydrated>[0]) {
-  await gotoHydrated(page, "/login");
-  await page
-    .getByTestId("login-member-select")
-    .selectOption({ label: "Admin" });
-  await page.getByTestId("login-submit").click();
-  await expect(page.getByTestId("session-name")).toHaveText("Admin");
-}
+const MEMBER_ROW_NAME_INPUT = "admin-member-name-input";
+const MEMBER_ROW_ROLE_SELECT = "admin-member-role-select";
+const MEMBER_ROW_STATUS = "admin-toggle-active";
+const MEMBER_ROW_SAVE_BUTTON = "admin-save-member";
+const MEMBER_ROW_RESET_BUTTON = "admin-reset-member";
+const MEMBER_ROW_DELETE_BUTTON = "admin-delete-member";
+const MEMBER_ROW_ERROR = "admin-row-error";
+
+const DELETE_POPUP_CONFIRM_DELETE_BUTTON = "admin-confirm-delete";
+const DELETE_POPUP_CANCEL_DELETE_BUTTON = "admin-cancel-delete";
 
 test.describe("Unauthorized access", () => {
   test("denies access when not logged in", async ({ page }) => {
@@ -44,21 +42,25 @@ test.describe("Admin member management", () => {
     await nameInput.fill(memberName);
     await createButton.click();
 
-    return [
-      page.locator(
-        `[data-member-id="${await page.locator(`[data-member-name="${memberName}"]`).getAttribute("data-member-id")}"]`,
-      ),
-      memberName,
-    ];
+    return [await getMemberRow(page, memberName), memberName];
+  }
+
+  async function getMemberRow(
+    page: Page,
+    memberName: string,
+  ): Promise<Locator> {
+    return page.locator(
+      `[data-member-id="${await page.locator(`[data-member-name="${memberName}"]`).getAttribute("data-member-id")}"]`,
+    );
   }
 
   test.beforeEach(async ({ page }) => {
     await loginAsAdmin(page);
     await page.getByRole("link", { name: "Admin" }).click();
 
-    nameInput = page.getByTestId("admin-member-name");
-    roleSelect = page.getByTestId("admin-member-role");
-    createButton = page.getByTestId("admin-create-member");
+    nameInput = page.getByTestId(ADD_MEMBER_NAME_INPUT);
+    roleSelect = page.getByTestId(ADD_MEMBER_ROLE_SELECT);
+    createButton = page.getByTestId(ADD_MEMBER_CREATE_BUTTON);
   });
 
   test("Add member is well formatted", async ({ page }) => {
@@ -83,17 +85,17 @@ test.describe("Admin member management", () => {
       ),
     ).toBe(false);
     await createButton.click();
-    await expect(page.getByTestId("admin-create-error")).toHaveCount(0);
+    await expect(page.getByTestId(ADD_MEMBER_ERROR)).toHaveCount(0);
   });
 
   test("Members list is well formatted", async ({ page }) => {
-    const adminRow = page.locator('[data-member-name="Admin"]');
+    const adminRow = await getMemberRow(page, "Admin");
 
-    const input = adminRow.getByTestId("admin-member-name-input");
-    const select = adminRow.getByTestId("admin-member-role-select");
-    const status = adminRow.getByTestId("admin-toggle-active");
-    const saveButton = adminRow.getByTestId("admin-save-member");
-    const resetButton = adminRow.getByTestId("admin-reset-member");
+    const input = adminRow.getByTestId(MEMBER_ROW_NAME_INPUT);
+    const select = adminRow.getByTestId(MEMBER_ROW_ROLE_SELECT);
+    const status = adminRow.getByTestId(MEMBER_ROW_STATUS);
+    const saveButton = adminRow.getByTestId(MEMBER_ROW_SAVE_BUTTON);
+    const resetButton = adminRow.getByTestId(MEMBER_ROW_RESET_BUTTON);
 
     await expect(adminRow).toBeVisible();
     await expect(input).toBeVisible();
@@ -130,46 +132,39 @@ test.describe("Admin member management", () => {
 
   test("admin can not delete themselves", async ({ page }) => {
     const adminRow = page.locator('[data-member-name="Admin"]');
-    await expect(adminRow.getByTestId("admin-delete-member")).toHaveCount(0);
+    await expect(adminRow.getByTestId(MEMBER_ROW_DELETE_BUTTON)).toHaveCount(0);
   });
 
   test("Save and reset disabled state updates when name is changed", async ({
     page,
   }) => {
-    function getAdminRow(adminName: string): Locator {
-      return page.locator(`[data-member-name="${adminName}"]`);
-    }
-    function getSaveButton(adminName: string): Locator {
-      return getAdminRow(adminName).getByTestId("admin-save-member");
-    }
-    function getResetButton(adminName: string): Locator {
-      return getAdminRow(adminName).getByTestId("admin-reset-member");
-    }
-    function getNameInput(adminName: string): Locator {
-      return getAdminRow(adminName).getByTestId("admin-member-name-input");
-    }
+    const adminRow = await getMemberRow(page, "Admin");
+    const saveButton = adminRow.getByTestId(MEMBER_ROW_SAVE_BUTTON);
+    const resetButton = adminRow.getByTestId(MEMBER_ROW_RESET_BUTTON);
+    const nameInput = adminRow.getByTestId(MEMBER_ROW_NAME_INPUT);
 
-    await expect(getSaveButton("Admin")).toBeDisabled();
-    await expect(getResetButton("Admin")).toBeDisabled();
+    await expect(saveButton).toBeDisabled();
+    await expect(resetButton).toBeDisabled();
+    await expect(nameInput).toHaveValue("Admin");
 
-    await getNameInput("Admin").fill("");
-    await expect(getSaveButton("")).toBeEnabled();
-    await expect(getResetButton("")).toBeEnabled();
+    await nameInput.fill("");
+    await expect(saveButton).toBeEnabled();
+    await expect(resetButton).toBeEnabled();
 
-    await getNameInput("").fill("Admin");
-    await expect(getSaveButton("Admin")).toBeDisabled();
-    await expect(getResetButton("Admin")).toBeDisabled();
+    await nameInput.fill("Admin");
+    await expect(saveButton).toBeDisabled();
+    await expect(resetButton).toBeDisabled();
 
-    await expect(getAdminRow("Admin")).toBeVisible();
+    await expect(adminRow).toBeVisible();
   });
 
   test("Save and reset disabled state updates when status is changed", async ({
     page,
   }) => {
-    const adminRow = page.locator('[data-member-name="Admin"]');
-    const saveButton = adminRow.getByTestId("admin-save-member");
-    const resetButton = adminRow.getByTestId("admin-reset-member");
-    const status = adminRow.getByTestId("admin-toggle-active");
+    const adminRow = await getMemberRow(page, "Admin");
+    const saveButton = adminRow.getByTestId(MEMBER_ROW_SAVE_BUTTON);
+    const resetButton = adminRow.getByTestId(MEMBER_ROW_RESET_BUTTON);
+    const status = adminRow.getByTestId(MEMBER_ROW_STATUS);
 
     await expect(saveButton).toBeDisabled();
     await expect(resetButton).toBeDisabled();
@@ -188,10 +183,10 @@ test.describe("Admin member management", () => {
   test("Save and reset disabled state updates when role is changed", async ({
     page,
   }) => {
-    const adminRow = page.locator('[data-member-name="Admin"]');
-    const saveButton = adminRow.getByTestId("admin-save-member");
-    const resetButton = adminRow.getByTestId("admin-reset-member");
-    const role = adminRow.getByTestId("admin-member-role-select");
+    const adminRow = await getMemberRow(page, "Admin");
+    const saveButton = adminRow.getByTestId(MEMBER_ROW_SAVE_BUTTON);
+    const resetButton = adminRow.getByTestId(MEMBER_ROW_RESET_BUTTON);
+    const role = adminRow.getByTestId(MEMBER_ROW_ROLE_SELECT);
 
     await expect(saveButton).toBeDisabled();
     await expect(resetButton).toBeDisabled();
@@ -211,9 +206,9 @@ test.describe("Admin member management", () => {
     const [createdMember, _] = await createMember(page);
     await expect(createdMember).toBeVisible();
 
-    const saveButton = createdMember.getByTestId("admin-save-member");
-    const resetButton = createdMember.getByTestId("admin-reset-member");
-    const deleteButton = createdMember.getByTestId("admin-delete-member");
+    const saveButton = createdMember.getByTestId(MEMBER_ROW_SAVE_BUTTON);
+    const resetButton = createdMember.getByTestId(MEMBER_ROW_RESET_BUTTON);
+    const deleteButton = createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON);
     const saveButtonHeight = (await saveButton.boundingBox())!.height;
     expect((await deleteButton.boundingBox())?.height).toBeCloseTo(
       saveButtonHeight,
@@ -228,40 +223,43 @@ test.describe("Admin member management", () => {
     await expect(deleteButton).toBeEnabled();
 
     await deleteButton.click();
-    await createdMember.getByTestId("admin-confirm-delete").click();
+    await createdMember.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON).click();
     await expect(createdMember).not.toBeVisible();
   });
 
   test("renaming fails when renaming to an existing name", async ({ page }) => {
     const [createdMember, createdMemberName] = await createMember(page);
-    await page.reload({ waitUntil: "networkidle" });
     const [createdMember2] = await createMember(page);
+
+    const saveButton = createdMember2.getByTestId(MEMBER_ROW_SAVE_BUTTON);
 
     await expect(createdMember).toBeVisible();
     await expect(createdMember2).toBeVisible();
 
     await createdMember2
-      .getByTestId("admin-member-name-input")
+      .getByTestId(MEMBER_ROW_NAME_INPUT)
       .fill(createdMemberName);
-    await createdMember2.getByTestId("admin-save-member").isEnabled();
-    await createdMember2.getByTestId("admin-save-member").click();
-    await expect(createdMember2.getByTestId("admin-row-error")).toContainText(
+    await saveButton.isEnabled();
+    await saveButton.click();
+    await expect(createdMember2.getByTestId(MEMBER_ROW_ERROR)).toContainText(
       "A member with this name already exists",
     );
 
-    await createdMember.getByTestId("admin-delete-member").click();
-    await createdMember.getByTestId("admin-confirm-delete").click();
-    await createdMember2.getByTestId("admin-delete-member").click();
-    await createdMember2.getByTestId("admin-confirm-delete").click();
+    await createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON).click();
+    await createdMember2.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember2
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
+      .click();
   });
 
   test("resets member uses previously saved values", async ({ page }) => {
     const [createdMember, memberName] = await createMember(page);
-    const memberInput = createdMember.getByTestId("admin-member-name-input");
-    const memberSelect = createdMember.getByTestId("admin-member-role-select");
-    const memberStatus = createdMember.getByTestId("admin-toggle-active");
-    const saveButton = createdMember.getByTestId("admin-save-member");
-    const resetButton = createdMember.getByTestId("admin-reset-member");
+    const memberInput = createdMember.getByTestId(MEMBER_ROW_NAME_INPUT);
+    const memberSelect = createdMember.getByTestId(MEMBER_ROW_ROLE_SELECT);
+    const memberStatus = createdMember.getByTestId(MEMBER_ROW_STATUS);
+    const saveButton = createdMember.getByTestId(MEMBER_ROW_SAVE_BUTTON);
+    const resetButton = createdMember.getByTestId(MEMBER_ROW_RESET_BUTTON);
 
     await expect(memberInput).toHaveValue(memberName);
     await expect(memberSelect).toHaveValue("member");
@@ -293,16 +291,16 @@ test.describe("Admin member management", () => {
     await expect(saveButton).toBeDisabled();
     await expect(resetButton).toBeDisabled();
 
-    await createdMember.getByTestId("admin-delete-member").click();
-    await createdMember.getByTestId("admin-confirm-delete").click();
+    await createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON).click();
   });
 
   test("save member uses saves values", async ({ page }) => {
     const [createdMember, memberName] = await createMember(page);
-    const memberInput = createdMember.getByTestId("admin-member-name-input");
-    const memberSelect = createdMember.getByTestId("admin-member-role-select");
-    const memberStatus = createdMember.getByTestId("admin-toggle-active");
-    const saveButton = createdMember.getByTestId("admin-save-member");
+    const memberInput = createdMember.getByTestId(MEMBER_ROW_NAME_INPUT);
+    const memberSelect = createdMember.getByTestId(MEMBER_ROW_ROLE_SELECT);
+    const memberStatus = createdMember.getByTestId(MEMBER_ROW_STATUS);
+    const saveButton = createdMember.getByTestId(MEMBER_ROW_SAVE_BUTTON);
 
     await expect(memberInput).toHaveValue(memberName);
     await expect(memberSelect).toHaveValue("member");
@@ -324,8 +322,8 @@ test.describe("Admin member management", () => {
     await expect(memberStatus).toHaveText("Inactive");
 
     await expect(saveButton).toBeDisabled();
-    await createdMember.getByTestId("admin-delete-member").click();
-    await createdMember.getByTestId("admin-confirm-delete").click();
+    await createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON).click();
   });
 
   test("list of members is ordered after adding new member", async ({
@@ -347,12 +345,18 @@ test.describe("Admin member management", () => {
       })
       .toBe(true);
 
-    await createdMember1.getByTestId("admin-delete-member").click();
-    await createdMember1.getByTestId("admin-confirm-delete").click();
-    await createdMember2.getByTestId("admin-delete-member").click();
-    await createdMember2.getByTestId("admin-confirm-delete").click();
-    await createdMember3.getByTestId("admin-delete-member").click();
-    await createdMember3.getByTestId("admin-confirm-delete").click();
+    await createdMember1.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember1
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
+      .click();
+    await createdMember2.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember2
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
+      .click();
+    await createdMember3.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember3
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
+      .click();
   });
 
   test("list of members is ordered after renaming member", async ({ page }) => {
@@ -362,9 +366,9 @@ test.describe("Admin member management", () => {
     const memberName2AfterRename = `BBB ${randomUUID()}`;
 
     await createdMember2
-      .getByTestId("admin-member-name-input")
+      .getByTestId(MEMBER_ROW_NAME_INPUT)
       .fill(memberName2AfterRename);
-    await createdMember2.getByTestId("admin-save-member").click();
+    await createdMember2.getByTestId(MEMBER_ROW_SAVE_BUTTON).click();
 
     await expect
       .poll(async () => {
@@ -377,22 +381,28 @@ test.describe("Admin member management", () => {
       })
       .toBe(true);
 
-    await createdMember1.getByTestId("admin-delete-member").click();
-    await createdMember1.getByTestId("admin-confirm-delete").click();
-    await createdMember2.getByTestId("admin-delete-member").click();
-    await createdMember2.getByTestId("admin-confirm-delete").click();
-    await createdMember3.getByTestId("admin-delete-member").click();
-    await createdMember3.getByTestId("admin-confirm-delete").click();
+    await createdMember1.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember1
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
+      .click();
+    await createdMember2.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember2
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
+      .click();
+    await createdMember3.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember3
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
+      .click();
   });
 
   test("At least one active admin must remain", async ({ page }) => {
-    const adminRow = page.locator('[data-member-name="Admin"]');
-    const errorMessage = adminRow.getByTestId("admin-row-error");
+    const adminRow = await getMemberRow(page, "Admin");
+    const errorMessage = adminRow.getByTestId(MEMBER_ROW_ERROR);
 
-    const select = adminRow.getByTestId("admin-member-role-select");
-    const status = adminRow.getByTestId("admin-toggle-active");
-    const saveButton = adminRow.getByTestId("admin-save-member");
-    const resetButton = adminRow.getByTestId("admin-reset-member");
+    const select = adminRow.getByTestId(MEMBER_ROW_ROLE_SELECT);
+    const status = adminRow.getByTestId(MEMBER_ROW_STATUS);
+    const saveButton = adminRow.getByTestId(MEMBER_ROW_SAVE_BUTTON);
+    const resetButton = adminRow.getByTestId(MEMBER_ROW_RESET_BUTTON);
 
     await select.selectOption("member");
     await saveButton.click();
@@ -410,14 +420,16 @@ test.describe("Admin member management", () => {
       "At least one active admin must remain",
     );
 
-    await expect(adminRow.getByTestId("admin-delete-member")).toBeHidden();
-    await expect(adminRow.getByTestId("admin-confirm-delete")).toBeHidden();
+    await expect(adminRow.getByTestId(MEMBER_ROW_DELETE_BUTTON)).toBeHidden();
+    await expect(
+      adminRow.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON),
+    ).toBeHidden();
   });
 
   test("deleting member shows confirmation dialog", async ({ page }) => {
     const [createdMember, memberName] = await createMember(page);
 
-    await createdMember.getByTestId("admin-delete-member").click();
+    await createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
     const deleteDialog = page.getByRole("dialog", { name: "Delete member?" });
     await expect(deleteDialog).toBeVisible();
     await expect
@@ -430,21 +442,21 @@ test.describe("Admin member management", () => {
       .toBe(`Permanently delete ${memberName}?`);
     await expect(deleteDialog).toHaveCSS("text-align", "left");
     const deleteButtonBox = await deleteDialog
-      .getByTestId("admin-confirm-delete")
+      .getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON)
       .boundingBox();
     const cancelButtonBox = await deleteDialog
-      .getByTestId("admin-cancel-delete")
+      .getByTestId(DELETE_POPUP_CANCEL_DELETE_BUTTON)
       .boundingBox();
     expect(deleteButtonBox).not.toBeNull();
     expect(cancelButtonBox).not.toBeNull();
     expect(cancelButtonBox!.y).toBe(deleteButtonBox!.y);
-    await createdMember.getByTestId("admin-cancel-delete").click();
+    await createdMember.getByTestId(DELETE_POPUP_CANCEL_DELETE_BUTTON).click();
     await expect(deleteDialog).toBeHidden();
     await expect(createdMember).toBeVisible();
 
-    await createdMember.getByTestId("admin-delete-member").click();
+    await createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
     await expect(deleteDialog).toBeVisible();
-    await createdMember.getByTestId("admin-confirm-delete").click();
+    await createdMember.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON).click();
     await expect(deleteDialog).toBeHidden();
     await expect(createdMember).toBeHidden();
     await expect(page.getByTestId("admin-table-feedback")).toHaveCount(0);
