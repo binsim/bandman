@@ -301,6 +301,7 @@ fn MemberRow(
                 <div class="admin-role-control">
                     <select
                         class="select admin-role-select"
+                        data-testid="admin-member-role-select"
                         aria-label=role_label
                         prop:value=move || role.get().to_string()
                         on:change=move |event| {
