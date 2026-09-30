@@ -235,7 +235,7 @@ test.describe("Admin member management", () => {
   test("renaming fails when renaming to an existing name", async ({ page }) => {
     const [createdMember, createdMemberName] = await createMember(page);
     await page.reload({ waitUntil: "networkidle" });
-    const [createdMember2, ] = await createMember(page);
+    const [createdMember2] = await createMember(page);
 
     await expect(createdMember).toBeVisible();
     await expect(createdMember2).toBeVisible();
