@@ -17,9 +17,13 @@ considering and later planning them.
 - Let members give separate feedback on the medley as a whole, without changing
   the feedback status of its individual songs.
 - Select multiple ungrouped songs to create a named, ordered medley. Its creator
-  and admins can rename it, add or remove songs, or dissolve it without
-  deleting the songs. They can also move songs up or down to set the medley
-  order; medley members are never alphabetically sorted.
+  and admins can edit its name, membership, and order together, or delete the
+  group without deleting the songs. Medley members are never alphabetically
+  sorted.
+- Edit a medley in one session, staging its name, song membership, and order
+  before saving all changes together. Add songs by selecting them in the
+  wishlist rather than showing a second, potentially long song list in the
+  editor.
 - Give medley-specific feedback when a different ordering would work better or
   when a song does not fit in the medley.
 - Allow the proposer to delete their wish and admins to delete any wish.

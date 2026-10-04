@@ -142,34 +142,18 @@ async fn wishlist_create_medley(
         .map_err(|error| ServerFnError::new(error.to_string()))
 }
 
-#[server(WishlistAddMedleyItems, "/api")]
-async fn wishlist_add_medley_items(
+#[server(WishlistUpdateMedley, "/api")]
+async fn wishlist_update_medley(
     medley_id: uuid::Uuid,
     item_ids: Vec<uuid::Uuid>,
-) -> Result<(), ServerFnError> {
-    let pool = expect_context::<crate::state::AppState>().pool;
-    let member = crate::auth::session::require_member().await?;
-    WishlistItem::add_medley_items(
-        &pool,
-        medley_id,
-        &item_ids,
-        member.id,
-        member.role == crate::models::MemberRole::Admin,
-    )
-    .await
-    .map_err(|error| ServerFnError::new(error.to_string()))
-}
-
-#[server(WishlistUpdateMedleyName, "/api")]
-async fn wishlist_update_medley_name(
-    medley_id: uuid::Uuid,
     name: String,
 ) -> Result<(), ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::auth::session::require_member().await?;
-    WishlistItem::update_medley_name(
+    WishlistItem::update_medley(
         &pool,
         medley_id,
+        &item_ids,
         &name,
         member.id,
         member.role == crate::models::MemberRole::Admin,
@@ -360,6 +344,12 @@ fn WishlistLoaded(
 ) -> AnyView {
     let items = RwSignal::new(initial_items);
     let medley_feedback = RwSignal::new(initial_medley_feedback);
+    let medley_management_active = RwSignal::new(false);
+    provide_context(medley_management_active);
+    let editing_medley_id = RwSignal::new(Option::<uuid::Uuid>::None);
+    provide_context(editing_medley_id);
+    let editing_medley_song_ids = RwSignal::new(Vec::<uuid::Uuid>::new());
+    provide_context(editing_medley_song_ids);
     let show_needs_feedback = RwSignal::new(initial_show_needs_feedback);
     let filter_pending = RwSignal::new(false);
     let filter_error = RwSignal::new(Option::<String>::None);
@@ -380,14 +370,15 @@ fn WishlistLoaded(
         });
     });
     let selecting_medley = RwSignal::new(false);
-    let target_medley = RwSignal::new(Option::<uuid::Uuid>::None);
     let new_medley_name = RwSignal::new(String::new());
     let selected_songs = RwSignal::new(Vec::<uuid::Uuid>::new());
     let medley_pending = RwSignal::new(false);
     let medley_error = RwSignal::new(Option::<String>::None);
     let visible_items = Memo::new(move |_| {
         let items = items.get();
-        if show_needs_feedback.get() {
+        if editing_medley_id.get().is_some() {
+            items
+        } else if show_needs_feedback.get() {
             let medleys_with_pending_feedback: std::collections::HashSet<_> = items
                 .iter()
                 .filter(|item| {
@@ -423,72 +414,20 @@ fn WishlistLoaded(
     });
     let create_medley = Callback::new(move |_: ()| {
         let selected = selected_songs.get();
-        let target = target_medley.get();
         let name = new_medley_name.get();
         medley_pending.set(true);
         medley_error.set(None);
         leptos::task::spawn_local(async move {
-            let result = match target {
-                Some(medley_id) => wishlist_add_medley_items(medley_id, selected.clone())
-                    .await
-                    .map(|()| medley_id),
-                None => wishlist_create_medley(selected.clone(), name.clone()).await,
-            };
-            match result {
+            match wishlist_create_medley(selected.clone(), name.clone()).await {
                 Ok(medley_id) => {
                     items.update(|items| {
-                        let start_position = if target.is_some() {
-                            items
-                                .iter()
-                                .filter(|item| item.medley_id == Some(medley_id))
-                                .filter_map(|item| item.medley_position)
-                                .max()
-                                .map_or(0, |position| position + 1)
-                        } else {
-                            0
-                        };
-                        let group_size = start_position as i64 + selected.len() as i64;
-                        let group_name = if target.is_some() {
-                            items
-                                .iter()
-                                .find(|item| item.medley_id == Some(medley_id))
-                                .and_then(|item| item.medley_name.clone())
-                                .unwrap_or_default()
-                        } else {
-                            name
-                        };
-                        let group_creator = items
-                            .iter()
-                            .find(|item| item.medley_id == Some(medley_id))
-                            .and_then(|item| item.medley_created_by_id)
-                            .or(Some(member_id));
                         for (index, id) in selected.iter().enumerate() {
                             if let Some(item) = items.iter_mut().find(|item| item.id == *id) {
                                 item.medley_id = Some(medley_id);
-                                item.medley_position = Some(start_position + index as i32);
-                                item.medley_size = Some(group_size);
-                                item.medley_created_by_id = group_creator;
-                                item.medley_name = Some(group_name.clone());
-                            }
-                        }
-                        for item in items
-                            .iter_mut()
-                            .filter(|item| item.medley_id == Some(medley_id))
-                        {
-                            item.medley_size = Some(group_size);
-                            item.medley_name = Some(group_name.clone());
-                        }
-                        if target.is_some() {
-                            let mut group: Vec<_> = items
-                                .iter()
-                                .filter(|item| item.medley_id == Some(medley_id))
-                                .map(|item| (item.medley_position.unwrap_or_default(), item.id))
-                                .collect();
-                            group.sort_by_key(|(position, _)| *position);
-                            for (position, (_, id)) in group.iter().enumerate() {
-                                if let Some(item) = items.iter_mut().find(|item| item.id == *id) {
-                                    item.medley_position = Some(position as i32);
-                                }
+                                item.medley_position = Some(index as i32);
+                                item.medley_size = Some(selected.len() as i64);
+                                item.medley_created_by_id = Some(member_id);
+                                item.medley_name = Some(name.clone());
                             }
                         }
                         sort_wishlist_items(items);
@@ -496,27 +435,19 @@ fn WishlistLoaded(
                     on_filter_changed.run(false);
                     selected_songs.set(Vec::new());
                     selecting_medley.set(false);
-                    target_medley.set(None);
-                    if target.is_none() {
-                        new_medley_name.set(String::new());
-                    }
+                    medley_management_active.set(false);
+                    new_medley_name.set(String::new());
                 }
                 Err(message) => medley_error.set(Some(message.to_string())),
             }
             medley_pending.set(false);
         });
     });
-    let start_adding_to_medley = Callback::new(move |medley_id| {
-        selected_songs.set(Vec::new());
-        target_medley.set(Some(medley_id));
-        medley_error.set(None);
-        selecting_medley.set(true);
-    });
     let start_creating_medley = Callback::new(move |_: ()| {
         selected_songs.set(Vec::new());
-        target_medley.set(None);
         medley_error.set(None);
         selecting_medley.set(true);
+        medley_management_active.set(true);
     });
     let on_medley_renamed = Callback::new(move |(medley_id, name): (uuid::Uuid, String)| {
         items.update(|items| {
@@ -653,7 +584,6 @@ fn WishlistLoaded(
                 filter_error
                 on_filter_changed
                 selecting_medley
-                target_medley
                 new_medley_name
                 selected_songs
                 medley_pending
@@ -661,7 +591,6 @@ fn WishlistLoaded(
                 on_create_medley=create_medley
                 on_start_creating_medley=start_creating_medley
                 on_disband_medley=disband_medley
-                on_start_adding_to_medley=start_adding_to_medley
                 on_medley_renamed
                 on_remove_medley_item=remove_medley_item
                 on_move_medley_item=move_medley_item
@@ -715,7 +644,6 @@ fn WishlistListing(
     filter_error: RwSignal<Option<String>>,
     on_filter_changed: Callback<bool>,
     selecting_medley: RwSignal<bool>,
-    target_medley: RwSignal<Option<uuid::Uuid>>,
     new_medley_name: RwSignal<String>,
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
@@ -723,7 +651,6 @@ fn WishlistListing(
     on_create_medley: Callback<()>,
     on_start_creating_medley: Callback<()>,
     on_disband_medley: Callback<uuid::Uuid>,
-    on_start_adding_to_medley: Callback<uuid::Uuid>,
     on_medley_renamed: Callback<(uuid::Uuid, String)>,
     on_remove_medley_item: Callback<(uuid::Uuid, uuid::Uuid)>,
     on_move_medley_item: Callback<(uuid::Uuid, uuid::Uuid, i32)>,
@@ -743,9 +670,7 @@ fn WishlistListing(
                 />
             </div>
             <WishlistMedleyControls
-                items
                 selecting_medley
-                target_medley
                 new_medley_name
                 selected_songs
                 medley_pending
@@ -777,7 +702,6 @@ fn WishlistListing(
                             selected_songs
                             medley_pending
                             on_disband_medley
-                            on_start_adding_to_medley
                             on_medley_renamed
                             on_remove_medley_item
                             on_move_medley_item
@@ -840,29 +764,18 @@ fn WishlistListHeader(
 
 #[component]
 fn WishlistMedleyControls(
-    items: RwSignal<Vec<WishlistItem>>,
     selecting_medley: RwSignal<bool>,
-    target_medley: RwSignal<Option<uuid::Uuid>>,
     new_medley_name: RwSignal<String>,
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
     medley_error: RwSignal<Option<String>>,
     on_create_medley: Callback<()>,
 ) -> AnyView {
-    let target_name = Memo::new(move |_| {
-        target_medley.get().and_then(|medley_id| {
-            items
-                .get()
-                .into_iter()
-                .find(|item| item.medley_id == Some(medley_id))
-                .and_then(|item| item.medley_name)
-        })
-    });
+    let medley_management_active = expect_context::<RwSignal<bool>>();
     view! {
         <div
             class="wishlist-medley-controls"
             class:is-selecting=move || selecting_medley.get()
-            class:is-adding=move || selecting_medley.get() && target_medley.get().is_some()
         >
             <Show when=move || selecting_medley.get()>
                 <button
@@ -870,7 +783,7 @@ fn WishlistMedleyControls(
                     type="button"
                     on:click=move |_| {
                         selecting_medley.set(false);
-                        target_medley.set(None);
+                        medley_management_active.set(false);
                         selected_songs.set(Vec::new());
                         new_medley_name.set(String::new());
                         medley_error.set(None);
@@ -882,51 +795,29 @@ fn WishlistMedleyControls(
             </Show>
             <Show when=move || selecting_medley.get()>
                 <span class="wishlist-medley-selection-hint">
-                    {move || if target_medley.get().is_some() {
-                        tr!("wishlist-medley-add-target-hint", {
-                            "name" => target_name.get().unwrap_or_default()
-                        })
-                    } else {
-                        tr!("wishlist-medley-create-hint")
-                    }}
+                    {move || tr!("wishlist-medley-create-hint")}
                 </span>
                 <div class="wishlist-medley-selection-actions">
                     <span class="muted wishlist-medley-selected-count">
                         {move || tr!("wishlist-medley-selected", {"count" => selected_songs.get().len().to_string()})}
                     </span>
-                    <Show when=move || target_medley.get().is_some()>
-                        <button
-                            class="btn btn-primary btn-sm"
-                            type="button"
-                            on:click=move |_| on_create_medley.run(())
-                            disabled=move || medley_pending.get() || selected_songs.get().is_empty()
-                        >
-                            {move || if medley_pending.get() {
-                                tr!("wishlist-medley-adding")
-                            } else {
-                                tr!("wishlist-medley-add-selected")
-                            }}
-                        </button>
-                    </Show>
-                    <Show when=move || target_medley.get().is_none()>
-                        <input
-                            class="input wishlist-medley-name-input"
-                            maxlength="120"
-                            aria-label=move || tr!("wishlist-medley-name")
-                            placeholder=move || tr!("wishlist-medley-name")
-                            prop:value=move || new_medley_name.get()
-                            on:input=move |event| new_medley_name.set(event_target_value(&event))
-                            disabled=move || medley_pending.get()
-                        />
-                        <button
-                            class="btn btn-primary btn-sm"
-                            type="button"
-                            on:click=move |_| on_create_medley.run(())
-                            disabled=move || medley_pending.get() || selected_songs.get().len() < 2 || new_medley_name.get().trim().is_empty()
-                        >
-                            {move || if medley_pending.get() { tr!("wishlist-medley-saving") } else { tr!("wishlist-medley-create") }}
-                        </button>
-                    </Show>
+                    <input
+                        class="input wishlist-medley-name-input"
+                        maxlength="120"
+                        aria-label=move || tr!("wishlist-medley-name")
+                        placeholder=move || tr!("wishlist-medley-name")
+                        prop:value=move || new_medley_name.get()
+                        on:input=move |event| new_medley_name.set(event_target_value(&event))
+                        disabled=move || medley_pending.get()
+                    />
+                    <button
+                        class="btn btn-primary btn-sm"
+                        type="button"
+                        on:click=move |_| on_create_medley.run(())
+                        disabled=move || medley_pending.get() || selected_songs.get().len() < 2 || new_medley_name.get().trim().is_empty()
+                    >
+                        {move || if medley_pending.get() { tr!("wishlist-medley-saving") } else { tr!("wishlist-medley-create") }}
+                    </button>
                 </div>
             </Show>
         </div>
@@ -945,7 +836,6 @@ fn WishlistItemList(
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
     on_disband_medley: Callback<uuid::Uuid>,
-    on_start_adding_to_medley: Callback<uuid::Uuid>,
     on_medley_renamed: Callback<(uuid::Uuid, String)>,
     on_remove_medley_item: Callback<(uuid::Uuid, uuid::Uuid)>,
     on_move_medley_item: Callback<(uuid::Uuid, uuid::Uuid, i32)>,
@@ -1032,7 +922,6 @@ fn WishlistItemList(
                         selected_songs
                         medley_pending
                         on_disband_medley
-                        on_start_adding_to_medley
                         on_medley_renamed
                         on_remove_medley_item
                         on_move_medley_item
@@ -1058,7 +947,6 @@ fn WishlistListEntry(
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
     on_disband_medley: Callback<uuid::Uuid>,
-    on_start_adding_to_medley: Callback<uuid::Uuid>,
     on_medley_renamed: Callback<(uuid::Uuid, String)>,
     on_remove_medley_item: Callback<(uuid::Uuid, uuid::Uuid)>,
     on_move_medley_item: Callback<(uuid::Uuid, uuid::Uuid, i32)>,
@@ -1095,7 +983,6 @@ fn WishlistListEntry(
                 selected_songs
                 medley_pending
                 on_disband_medley
-                on_start_adding_to_medley
                 on_medley_renamed
                 on_remove_medley_item
                 on_move_medley_item
@@ -1119,7 +1006,6 @@ fn WishlistMedley(
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
     on_disband_medley: Callback<uuid::Uuid>,
-    on_start_adding_to_medley: Callback<uuid::Uuid>,
     on_medley_renamed: Callback<(uuid::Uuid, String)>,
     on_remove_medley_item: Callback<(uuid::Uuid, uuid::Uuid)>,
     on_move_medley_item: Callback<(uuid::Uuid, uuid::Uuid, i32)>,
@@ -1127,6 +1013,7 @@ fn WishlistMedley(
     on_updated: Callback<WishlistItem>,
     on_deleted: Callback<uuid::Uuid>,
 ) -> AnyView {
+    let medley_management_active = expect_context::<RwSignal<bool>>();
     let songs = Memo::new(move |_| {
         let mut songs: Vec<_> = items
             .get()
@@ -1154,35 +1041,85 @@ fn WishlistMedley(
     let expanded = RwSignal::new(true);
     let editing_name = RwSignal::new(false);
     let edit_name = RwSignal::new(medley_name.get_untracked());
+    let edit_song_ids = expect_context::<RwSignal<Vec<uuid::Uuid>>>();
+    let editing_medley_id = expect_context::<RwSignal<Option<uuid::Uuid>>>();
     let rename_pending = RwSignal::new(false);
     let rename_error = RwSignal::new(Option::<String>::None);
     let confirm_disband = RwSignal::new(false);
-    let start_renaming = Callback::new(move |_: ()| {
+    let edit_songs = Memo::new(move |_| {
+        let all_items = items.get();
+        edit_song_ids
+            .get()
+            .into_iter()
+            .filter_map(|song_id| all_items.iter().find(|item| item.id == song_id).cloned())
+            .collect::<Vec<_>>()
+    });
+    let start_editing = Callback::new(move |_: ()| {
         edit_name.set(medley_name.get());
+        edit_song_ids.set(songs.get().iter().map(|item| item.id).collect());
         rename_error.set(None);
+        editing_medley_id.set(Some(id));
         editing_name.set(true);
+        medley_management_active.set(true);
+        expanded.set(true);
+    });
+    let cancel_editing = Callback::new(move |_: ()| {
+        edit_name.set(medley_name.get());
+        edit_song_ids.set(Vec::new());
+        rename_error.set(None);
+        editing_medley_id.set(None);
+        editing_name.set(false);
+        medley_management_active.set(false);
     });
     let confirm_ungroup = Callback::new(move |_: ()| {
         on_disband_medley.run(id);
         confirm_disband.set(false);
     });
-    let rename_medley = move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
+    let save_medley = move |_| {
         let new_name = edit_name.get().trim().to_string();
-        if new_name.is_empty() {
+        let ordered_ids = edit_song_ids.get();
+        if new_name.is_empty() || ordered_ids.len() < 2 || rename_pending.get() {
             return;
         }
         rename_pending.set(true);
+        medley_pending.set(true);
         rename_error.set(None);
+        let creator_id = medley_creator.get();
         leptos::task::spawn_local(async move {
-            match wishlist_update_medley_name(id, new_name.clone()).await {
+            match wishlist_update_medley(id, ordered_ids.clone(), new_name.clone()).await {
                 Ok(()) => {
+                    let song_count = ordered_ids.len() as i64;
+                    items.update(|items| {
+                        for item in items.iter_mut().filter(|item| item.medley_id == Some(id)) {
+                            if !ordered_ids.contains(&item.id) {
+                                item.medley_id = None;
+                                item.medley_position = None;
+                                item.medley_size = None;
+                                item.medley_created_by_id = None;
+                                item.medley_name = None;
+                            }
+                        }
+                        for (position, song_id) in ordered_ids.iter().enumerate() {
+                            if let Some(item) = items.iter_mut().find(|item| item.id == *song_id) {
+                                item.medley_id = Some(id);
+                                item.medley_position = Some(position as i32);
+                                item.medley_size = Some(song_count);
+                                item.medley_created_by_id = creator_id;
+                                item.medley_name = Some(new_name.clone());
+                            }
+                        }
+                        sort_wishlist_items(items);
+                    });
                     on_medley_renamed.run((id, new_name.clone()));
+                    edit_song_ids.set(Vec::new());
+                    editing_medley_id.set(None);
                     editing_name.set(false);
+                    medley_management_active.set(false);
                 }
                 Err(message) => rename_error.set(Some(message.to_string())),
             }
             rename_pending.set(false);
+            medley_pending.set(false);
         });
     };
     view! {
@@ -1192,8 +1129,59 @@ fn WishlistMedley(
             data-testid="wishlist-medley"
         >
             <header class="wishlist-medley-header">
-                <Show when=move || editing_name.get()>
-                    <form class="wishlist-medley-rename" on:submit=rename_medley>
+                <div class="wishlist-medley-heading">
+                    <button
+                        class="wishlist-medley-toggle"
+                        type="button"
+                        aria-expanded=move || expanded.get().to_string()
+                        aria-label=move || if expanded.get() {
+                            tr!("wishlist-medley-collapse")
+                        } else {
+                            tr!("wishlist-medley-expand")
+                        }
+                        on:click=move |_| expanded.update(|expanded| *expanded = !*expanded)
+                    >
+                        <span aria-hidden="true">{move || if expanded.get() { "▾" } else { "▸" }}</span>
+                    </button>
+                    <h3>{move || medley_name.get()}</h3>
+                    <span class="muted">
+                        {move || tr!("wishlist-medley-song-count", {"count" => song_count.get().to_string()})}
+                    </span>
+                </div>
+                <div class="wishlist-medley-header-actions">
+                    <Show when=move || !medley_management_active.get()>
+                        <WishlistMedleyFeedbackControl
+                            medley_id=id
+                            member_id
+                            feedbacks=medley_feedback
+                        />
+                    </Show>
+                    <Show when=move || !medley_management_active.get() && can_manage() && !selecting_medley.get()>
+                        <WishlistMedleyActions
+                            name=medley_name
+                            pending=medley_pending
+                            confirming=confirm_disband
+                            on_edit=start_editing
+                            on_confirm_disband=confirm_ungroup
+                        />
+                    </Show>
+                </div>
+            </header>
+            <Show when=move || rename_error.get().is_some()>
+                <p class="form-error" role="alert">{move || rename_error.get().unwrap_or_default()}</p>
+            </Show>
+            <Show when=move || editing_name.get()>
+                <section
+                    class="wishlist-medley-editor"
+                    aria-label=move || tr!("wishlist-medley-edit")
+                    on:keydown=move |event: leptos::ev::KeyboardEvent| {
+                        if event.key() == "Escape" && !rename_pending.get() {
+                            cancel_editing.run(());
+                        }
+                    }
+                >
+                    <header class="wishlist-medley-editor-header">
+                        <h2>{move || tr!("wishlist-medley-edit")}</h2>
                         <input
                             class="input"
                             maxlength="120"
@@ -1202,68 +1190,77 @@ fn WishlistMedley(
                             on:input=move |event| edit_name.set(event_target_value(&event))
                             disabled=move || rename_pending.get()
                         />
-                        <button class="btn btn-primary btn-sm" type="submit" disabled=move || rename_pending.get()>
-                            {move || tr!("wishlist-medley-save-name")}
+                    </header>
+                    <p class="muted">{move || tr!("wishlist-medley-edit-hint")}</p>
+                    <div class="wishlist-medley-edit-list">
+                        <For
+                            each=move || edit_songs.get()
+                            key=|item| item.id
+                            children=move |item| {
+                                let song_id = item.id;
+                                view! {
+                                    <div class="wishlist-medley-edit-row">
+                                        <label class="wishlist-medley-edit-checkbox">
+                                            <input
+                                                type="checkbox"
+                                                aria-label=move || tr!("wishlist-medley-keep-song")
+                                                prop:checked=true
+                                                on:change=move |_| edit_song_ids.update(|ids| ids.retain(|id| *id != song_id))
+                                                disabled=move || rename_pending.get()
+                                            />
+                                        </label>
+                                        <div class="wishlist-medley-order-controls">
+                                            <button
+                                                class="btn btn-ghost btn-sm"
+                                                type="button"
+                                                aria-label=move || tr!("wishlist-medley-move-up")
+                                                on:click=move |_| edit_song_ids.update(|ids| move_song(ids, song_id, -1))
+                                                disabled=move || rename_pending.get() || edit_song_ids.get().first() == Some(&song_id)
+                                            >"↑"</button>
+                                            <button
+                                                class="btn btn-ghost btn-sm"
+                                                type="button"
+                                                aria-label=move || tr!("wishlist-medley-move-down")
+                                                on:click=move |_| edit_song_ids.update(|ids| move_song(ids, song_id, 1))
+                                                disabled=move || rename_pending.get() || edit_song_ids.get().last() == Some(&song_id)
+                                            >"↓"</button>
+                                        </div>
+                                        <WishlistRow
+                                            item=item.clone()
+                                            member_id
+                                            can_delete=can_delete_all || item.proposed_by_id == Some(member_id)
+                                            is_medley=true
+                                            on_feedback_changed
+                                            on_deleted
+                                            on_updated
+                                        />
+                                    </div>
+                                }
+                            }
+                        />
+                    </div>
+                    <div class="wishlist-medley-editor-actions">
+                        <button
+                            class="btn btn-primary btn-sm"
+                            type="button"
+                            on:click=save_medley
+                            disabled=move || rename_pending.get() || edit_name.get().trim().is_empty() || edit_song_ids.get().len() < 2
+                        >
+                            {move || if rename_pending.get() { tr!("wishlist-medley-saving-changes") } else { tr!("admin-save-changes") }}
                         </button>
                         <button
                             class="btn btn-ghost btn-sm"
                             type="button"
-                            on:click=move |_| {
-                                edit_name.set(medley_name.get());
-                                rename_error.set(None);
-                                editing_name.set(false);
-                            }
+                            on:click=move |_| cancel_editing.run(())
                             disabled=move || rename_pending.get()
                         >
                             {move || tr!("admin-cancel")}
                         </button>
-                    </form>
-                </Show>
-                <Show when=move || !editing_name.get()>
-                    <div class="wishlist-medley-heading">
-                        <button
-                            class="wishlist-medley-toggle"
-                            type="button"
-                            aria-expanded=move || expanded.get().to_string()
-                            aria-label=move || if expanded.get() {
-                                tr!("wishlist-medley-collapse")
-                            } else {
-                                tr!("wishlist-medley-expand")
-                            }
-                            on:click=move |_| expanded.update(|expanded| *expanded = !*expanded)
-                        >
-                            <span aria-hidden="true">{move || if expanded.get() { "▾" } else { "▸" }}</span>
-                        </button>
-                        <h3>{move || medley_name.get()}</h3>
-                        <span class="muted">
-                            {move || tr!("wishlist-medley-song-count", {"count" => song_count.get().to_string()})}
-                        </span>
                     </div>
-                </Show>
-                <Show when=move || !editing_name.get()>
-                    <div class="wishlist-medley-header-actions">
-                        <WishlistMedleyFeedbackControl
-                            medley_id=id
-                            member_id
-                            feedbacks=medley_feedback
-                        />
-                        <Show when=move || can_manage() && !selecting_medley.get()>
-                            <WishlistMedleyActions
-                                name=medley_name
-                                pending=medley_pending
-                                confirming=confirm_disband
-                                on_rename=start_renaming
-                                on_confirm_disband=confirm_ungroup
-                                on_add_songs=Callback::new(move |()| on_start_adding_to_medley.run(id))
-                            />
-                        </Show>
-                    </div>
-                </Show>
-            </header>
-            <Show when=move || rename_error.get().is_some()>
-                <p class="form-error" role="alert">{move || rename_error.get().unwrap_or_default()}</p>
+                </section>
             </Show>
             <Show when=move || expanded.get()>
+            <Show when=move || !editing_name.get()>
             <div class="wishlist-medley-songs">
                 <For
                     each=move || songs.get()
@@ -1281,11 +1278,12 @@ fn WishlistMedley(
                             on_deleted
                             on_remove_medley_item
                             on_move_medley_item
-                            can_manage_medley=can_manage()
+                            can_manage_medley=false
                         />
                     }
                 />
             </div>
+            </Show>
             </Show>
         </section>
     }
@@ -1297,38 +1295,53 @@ fn WishlistMedleyActions(
     name: Memo<String>,
     pending: RwSignal<bool>,
     confirming: RwSignal<bool>,
-    on_rename: Callback<()>,
+    on_edit: Callback<()>,
     on_confirm_disband: Callback<()>,
-    on_add_songs: Callback<()>,
 ) -> AnyView {
+    let menu_open = RwSignal::new(false);
     view! {
-        <details class="wishlist-medley-menu">
-            <summary class="btn btn-ghost btn-sm">{move || tr!("wishlist-medley-actions")}</summary>
+        <div class="wishlist-medley-menu">
+            <button
+                class="btn btn-ghost btn-sm"
+                type="button"
+                aria-expanded=move || menu_open.get().to_string()
+                on:click=move |_| menu_open.update(|open| *open = !*open)
+            >
+                {move || tr!("wishlist-medley-actions")}
+                <span class="wishlist-medley-menu-arrow" aria-hidden="true">"▾"</span>
+            </button>
+            <Show when=move || menu_open.get()>
+                <button
+                    class="wishlist-medley-menu-backdrop"
+                    type="button"
+                    aria-label=move || tr!("admin-cancel")
+                    on:click=move |_| menu_open.set(false)
+                ></button>
             <div class="wishlist-medley-menu-items">
                 <button
                     class="btn btn-ghost btn-sm"
                     type="button"
-                    on:click=move |_| on_add_songs.run(())
+                    on:click=move |_| {
+                        menu_open.set(false);
+                        on_edit.run(());
+                    }
                 >
-                    {move || tr!("wishlist-medley-add-songs")}
-                </button>
-                <button
-                    class="btn btn-ghost btn-sm"
-                    type="button"
-                    on:click=move |_| on_rename.run(())
-                >
-                    {move || tr!("wishlist-medley-rename")}
+                    {move || tr!("wishlist-medley-edit")}
                 </button>
                 <button
                     class="btn btn-ghost btn-danger btn-sm"
                     type="button"
-                    on:click=move |_| confirming.set(true)
+                    on:click=move |_| {
+                        menu_open.set(false);
+                        confirming.set(true);
+                    }
                     disabled=move || pending.get()
                 >
                     {move || tr!("wishlist-medley-disband")}
                 </button>
             </div>
-        </details>
+            </Show>
+        </div>
         <Show when=move || confirming.get()>
             <div class="admin-delete-backdrop">
                 <section
@@ -1381,6 +1394,8 @@ fn WishlistListItem(
     on_move_medley_item: Callback<(uuid::Uuid, uuid::Uuid, i32)>,
     can_manage_medley: bool,
 ) -> AnyView {
+    let editing_medley_id = expect_context::<RwSignal<Option<uuid::Uuid>>>();
+    let editing_medley_song_ids = expect_context::<RwSignal<Vec<uuid::Uuid>>>();
     let can_delete = can_delete_all || item.proposed_by_id == Some(member_id);
     let item_id = item.id;
     let medley_id = item.medley_id;
@@ -1398,7 +1413,11 @@ fn WishlistListItem(
         });
     };
     view! {
-        <div class="wishlist-medley-song" class:is-grouped=grouped>
+        <div
+            class="wishlist-medley-song"
+            class:is-grouped=grouped
+            class:is-manageable=grouped && can_manage_medley
+        >
             <Show when=move || selecting_medley.get() && !grouped>
                 <label class="wishlist-medley-select">
                     <input
@@ -1406,6 +1425,23 @@ fn WishlistListItem(
                         aria-label=move || tr!("wishlist-medley-select-song")
                         prop:checked=move || selected.get()
                         on:change=on_select
+                        disabled=move || medley_pending.get()
+                    />
+                </label>
+            </Show>
+            <Show when=move || editing_medley_id.get().is_some() && !grouped && !selecting_medley.get()>
+                <label class="wishlist-medley-select">
+                    <input
+                        type="checkbox"
+                        aria-label=move || tr!("wishlist-medley-select-song")
+                        prop:checked=move || editing_medley_song_ids.get().contains(&item_id)
+                        on:change=move |_| editing_medley_song_ids.update(|selected| {
+                            if selected.contains(&item_id) {
+                                selected.retain(|selected_id| *selected_id != item_id);
+                            } else {
+                                selected.push(item_id);
+                            }
+                        })
                         disabled=move || medley_pending.get()
                     />
                 </label>
@@ -1480,6 +1516,7 @@ fn WishlistRow(
     on_deleted: Callback<uuid::Uuid>,
     on_updated: Callback<WishlistItem>,
 ) -> AnyView {
+    let medley_management_active = expect_context::<RwSignal<bool>>();
     let title = RwSignal::new(item.title.clone());
     let artist = RwSignal::new(item.artist.clone().unwrap_or_default());
     let link = RwSignal::new(item.link.clone().unwrap_or_default());
@@ -1531,13 +1568,13 @@ fn WishlistRow(
             edit_pending.set(false);
         });
     };
-    let cancel_edit = move |_| {
+    let cancel_edit = Callback::new(move |_: ()| {
         edit_title.set(title.get());
         edit_artist.set(artist.get());
         edit_link.set(link.get());
         edit_error.set(None);
         editing.set(false);
-    };
+    });
     let delete_item = move |_| {
         delete_pending.set(true);
         delete_error.set(None);
@@ -1554,6 +1591,8 @@ fn WishlistRow(
     view! {
         <article
             class="wishlist-item"
+            class:is-medley=is_medley
+            class:is-editing=move || editing.get()
             class:needs-feedback=move || {
                 !feedbacks
                     .get()
@@ -1580,48 +1619,69 @@ fn WishlistRow(
                         </a>
                     </Show>
                 </div>
-                <div class="wishlist-item-actions">
-                    <WishlistFeedbackControl
-                        item_id
-                        member_id
-                        is_medley
-                        feedbacks
-                        on_feedback_changed
-                    />
-                    {if can_delete {
-                        view! {
-                            <button
-                                class="btn btn-ghost btn-sm wishlist-edit-button"
-                                type="button"
-                                data-testid="wishlist-edit"
-                                on:click=move |_| {
-                                    if editing.get() {
-                                        edit_title.set(title.get());
-                                        edit_artist.set(artist.get());
-                                        edit_link.set(link.get());
-                                        edit_error.set(None);
-                                        editing.set(false);
-                                    } else {
-                                        edit_title.set(title.get());
-                                        edit_artist.set(artist.get());
-                                        edit_link.set(link.get());
-                                        edit_error.set(None);
-                                        editing.set(true);
+                <Show when=move || !medley_management_active.get()>
+                    <div class="wishlist-item-actions">
+                        <WishlistFeedbackControl
+                            item_id
+                            member_id
+                            is_medley
+                            feedbacks
+                            on_feedback_changed
+                        />
+                        {if can_delete {
+                            view! {
+                                <button
+                                    class="btn btn-ghost btn-sm wishlist-edit-button"
+                                    type="button"
+                                    data-testid="wishlist-edit"
+                                    on:click=move |_| {
+                                        if editing.get() {
+                                            edit_title.set(title.get());
+                                            edit_artist.set(artist.get());
+                                            edit_link.set(link.get());
+                                            edit_error.set(None);
+                                            editing.set(false);
+                                        } else {
+                                            edit_title.set(title.get());
+                                            edit_artist.set(artist.get());
+                                            edit_link.set(link.get());
+                                            edit_error.set(None);
+                                            editing.set(true);
+                                        }
                                     }
-                                }
-                                disabled=move || edit_pending.get()
-                            >
-                                {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
-                            </button>
+                                    disabled=move || edit_pending.get()
+                                >
+                                    {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
+                                </button>
+                            }
+                            .into_any()
+                        } else {
+                            ().into_any()
                         }
-                        .into_any()
-                    } else {
-                        ().into_any()
-                    }}
-                </div>
+                        }
+                    </div>
+                </Show>
             </div>
             <Show when=move || editing.get()>
-                <form class="wishlist-edit-form" on:submit=update_song>
+                <button
+                    class="wishlist-edit-backdrop"
+                    type="button"
+                    aria-label=move || tr!("wishlist-close-edit")
+                    on:click=move |_| cancel_edit.run(())
+                    disabled=move || edit_pending.get()
+                ></button>
+                <form
+                    class="wishlist-edit-form"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label=move || tr!("wishlist-edit")
+                    on:submit=update_song
+                    on:keydown=move |event: leptos::ev::KeyboardEvent| {
+                        if event.key() == "Escape" && !edit_pending.get() {
+                            cancel_edit.run(());
+                        }
+                    }
+                >
                     <label class="field">
                         <span class="field-label">{move || tr!("wishlist-song-label")}</span>
                         <input
@@ -1661,7 +1721,7 @@ fn WishlistRow(
                         <button class="btn btn-primary btn-sm" type="submit" data-testid="wishlist-save-edit" disabled=move || edit_pending.get()>
                             {move || if edit_pending.get() { tr!("wishlist-edit-saving") } else { tr!("wishlist-save-edit") }}
                         </button>
-                        <button class="btn btn-ghost btn-sm" type="button" data-testid="wishlist-cancel-edit" on:click=cancel_edit disabled=move || edit_pending.get()>
+                        <button class="btn btn-ghost btn-sm" type="button" data-testid="wishlist-cancel-edit" on:click=move |_| cancel_edit.run(()) disabled=move || edit_pending.get()>
                             {move || tr!("admin-cancel")}
                         </button>
                         {if can_delete {
@@ -2190,4 +2250,14 @@ fn sort_wishlist_items(items: &mut [WishlistItem]) {
             })
             .then_with(|| left.title.cmp(&right.title))
     });
+}
+
+fn move_song(ids: &mut [uuid::Uuid], song_id: uuid::Uuid, delta: isize) {
+    let Some(position) = ids.iter().position(|id| *id == song_id) else {
+        return;
+    };
+    let next = position as isize + delta;
+    if (0..ids.len() as isize).contains(&next) {
+        ids.swap(position, next as usize);
+    }
 }

@@ -100,7 +100,7 @@ pub enum WishlistError {
     DeleteForbidden,
     #[error("You do not have permission to edit this song")]
     EditForbidden,
-    #[error("Select at least two songs that are not already in a medley")]
+    #[error("Select at least two unique songs for this medley")]
     InvalidMedleySelection,
     #[error("One or more selected songs are already in a medley")]
     SongAlreadyInMedley,
@@ -359,6 +359,97 @@ impl WishlistItem {
         } else {
             WishlistError::NotFound
         })
+    }
+
+    pub async fn update_medley(
+        pool: &PgPool,
+        medley_id: Uuid,
+        item_ids: &[Uuid],
+        name: &str,
+        member_id: Uuid,
+        is_admin: bool,
+    ) -> Result<(), WishlistError> {
+        let name = validate_medley_name(name)?;
+        if item_ids.len() < 2
+            || item_ids
+                .iter()
+                .copied()
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+                != item_ids.len()
+        {
+            return Err(WishlistError::InvalidMedleySelection);
+        }
+
+        let mut transaction = pool.begin().await?;
+        let medley_exists = sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM wishlist_medleys WHERE id = $1 AND (created_by = $2 OR $3) FOR UPDATE",
+        )
+        .bind(medley_id)
+        .bind(member_id)
+        .bind(is_admin)
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if medley_exists.is_none() {
+            let exists: bool =
+                sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM wishlist_medleys WHERE id = $1)")
+                    .bind(medley_id)
+                    .fetch_one(&mut *transaction)
+                    .await?;
+            return Err(if exists {
+                WishlistError::MedleyForbidden
+            } else {
+                WishlistError::NotFound
+            });
+        }
+
+        let existing_songs: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM wishlist_items WHERE id = ANY($1) ORDER BY id FOR UPDATE",
+        )
+        .bind(item_ids)
+        .fetch_all(&mut *transaction)
+        .await?;
+        if existing_songs.len() != item_ids.len() {
+            return Err(WishlistError::InvalidMedleySelection);
+        }
+        let belongs_to_another_medley: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS (
+                SELECT 1 FROM wishlist_medley_items
+                WHERE wishlist_item_id = ANY($1) AND medley_id <> $2
+            )
+            "#,
+        )
+        .bind(item_ids)
+        .bind(medley_id)
+        .fetch_one(&mut *transaction)
+        .await?;
+        if belongs_to_another_medley {
+            return Err(WishlistError::SongAlreadyInMedley);
+        }
+
+        sqlx::query("UPDATE wishlist_medleys SET name = $1 WHERE id = $2")
+            .bind(name)
+            .bind(medley_id)
+            .execute(&mut *transaction)
+            .await?;
+        sqlx::query("DELETE FROM wishlist_medley_items WHERE medley_id = $1")
+            .bind(medley_id)
+            .execute(&mut *transaction)
+            .await?;
+        for (position, item_id) in item_ids.iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO wishlist_medley_items (medley_id, wishlist_item_id, position) VALUES ($1, $2, $3)",
+            )
+            .bind(medley_id)
+            .bind(item_id)
+            .bind(position as i32)
+            .execute(&mut *transaction)
+            .await
+            .map_err(map_medley_unique_violation)?;
+        }
+        transaction.commit().await?;
+        Ok(())
     }
 
     pub async fn add_medley_items(
@@ -1828,5 +1919,104 @@ mod tests {
             .filter(|item| song_ids.contains(&item.id))
             .collect();
         assert!(remaining.iter().all(|item| item.medley_id.is_none()));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn medley_edit_atomically_updates_name_membership_and_order(pool: PgPool) {
+        let member = Member::create(
+            &pool,
+            &format!("Medley editor {}", Uuid::new_v4()),
+            crate::models::MemberRole::Member,
+        )
+        .await
+        .expect("member should be created");
+        let mut song_ids = Vec::new();
+        for title in [
+            "Edit medley one",
+            "Edit medley two",
+            "Edit medley three",
+            "Edit medley four",
+        ] {
+            song_ids.push(
+                WishlistItem::create(
+                    &pool,
+                    &format!("{title} {}", Uuid::new_v4()),
+                    None,
+                    None,
+                    None,
+                    &[],
+                    WishlistCategory::Song,
+                    member.id,
+                    &member.name,
+                )
+                .await
+                .expect("song should be created")
+                .id,
+            );
+        }
+        let medley_id = WishlistItem::create_medley(
+            &pool,
+            &[song_ids[0], song_ids[1]],
+            "Before edit",
+            member.id,
+        )
+        .await
+        .expect("medley should be created");
+
+        assert!(matches!(
+            WishlistItem::update_medley(
+                &pool,
+                medley_id,
+                &[song_ids[2]],
+                "Invalid edit",
+                member.id,
+                false,
+            )
+            .await,
+            Err(WishlistError::InvalidMedleySelection)
+        ));
+        WishlistItem::update_medley(
+            &pool,
+            medley_id,
+            &[song_ids[2], song_ids[0], song_ids[3]],
+            "After edit",
+            member.id,
+            false,
+        )
+        .await
+        .expect("medley edit should apply");
+
+        let listed = WishlistItem::list(&pool)
+            .await
+            .expect("wishlist should be listed");
+        let grouped: Vec<_> = listed
+            .iter()
+            .filter(|item| item.medley_id == Some(medley_id))
+            .collect();
+        assert_eq!(
+            grouped.iter().map(|item| item.id).collect::<Vec<_>>(),
+            vec![song_ids[2], song_ids[0], song_ids[3]]
+        );
+        assert!(grouped
+            .iter()
+            .all(|item| item.medley_name.as_deref() == Some("After edit")));
+        let removed_song = listed
+            .iter()
+            .find(|item| item.id == song_ids[1])
+            .expect("removed song should remain in the wishlist");
+        assert_eq!(removed_song.medley_id, None);
+
+        assert!(matches!(
+            WishlistItem::update_medley(
+                &pool,
+                medley_id,
+                &[song_ids[0], song_ids[1]],
+                "Unauthorized",
+                Uuid::new_v4(),
+                false,
+            )
+            .await,
+            Err(WishlistError::MedleyForbidden)
+        ));
     }
 }
