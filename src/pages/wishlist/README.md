@@ -1,24 +1,27 @@
 # Wishlist page
 
-**Status:** Not started (stub route only)
+**Status:** Initial implementation complete
 
 ## Purpose
 
-Every band member can enter **song wishes** and **vote** on them.
+Signed-in band members can suggest songs and give the band useful context for
+considering and later planning them.
 
-## Planned behaviour
+## Implemented
 
-- Add a wish (link to an existing song, or free-text title that can become a song later)
-- Vote once per member per wish (toggle or upvote)
-- Sort / filter by vote count and status (open / accepted / rejected)
-- Support **medleys**: a wish may reference a medley song (combination of songs)
-- Only active members; show who proposed each item
+- Persist a song title, optional artist and HTTP(S) link.
+- New wishes currently default to the regular song intent with no targets.
+- Show wishes alphabetically with title, artist, and resolved link-title badges.
+- Let each signed-in member set, update, or remove their own feedback for every wish.
+- Show the saved feedback and its author on the wish.
+- Allow the proposer to delete their wish and admins to delete any wish.
+- Allow the proposer and admins to edit the song title, artist, and link.
+- Require an active member session to view or add wishes.
 
-## Suggested data
+## Remaining
 
-- `wishlist_items` — song_id or free text, proposed_by, status
-- `wishlist_votes` — unique `(item_id, member_id)`
-
-## Out of scope for later
-
-- Auto-promoting a wish into the rehearsal plan (nice-to-have)
+- Edit wish intent (add as a song, add to a medley, try it, or mark as
+  unplayable) and add multiple targets (for example party, slow dance, or
+  discofox) after creating a wish.
+- Sort or filter by feedback and review state.
+- Connect targets and wish intents to the rehearsal-plan workflow.
