@@ -141,4 +141,5 @@ pub fn CreateSong(
             </Show>
         </section>
     }
+    .into_any()
 }
