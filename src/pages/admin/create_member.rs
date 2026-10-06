@@ -16,8 +16,8 @@ use crate::models::{Member, MemberRole};
 
 #[server(AdminCreateMember, "/api")]
 async fn admin_create_member(name: String, role: MemberRole) -> Result<Member, ServerFnError> {
-    crate::auth::session::require_admin().await?;
     let pool = expect_context::<crate::state::AppState>().pool;
+    crate::auth::session::require_admin().await?;
     Member::create(&pool, &name, role)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))

@@ -12,8 +12,8 @@ type MemberFeedback = Option<(Uuid, String)>;
 
 #[server(AdminListMembers, "/api")]
 pub(super) async fn admin_list_members() -> Result<Vec<Member>, ServerFnError> {
-    crate::auth::session::require_admin().await?;
     let pool = expect_context::<crate::state::AppState>().pool;
+    crate::auth::session::require_admin().await?;
     Member::list_all(&pool)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))
@@ -26,8 +26,8 @@ pub(super) async fn admin_update_member_details(
     role: MemberRole,
     active: bool,
 ) -> Result<Member, ServerFnError> {
-    crate::auth::session::require_admin().await?;
     let pool = expect_context::<crate::state::AppState>().pool;
+    crate::auth::session::require_admin().await?;
     let mut member = Member::find_by_id(&pool, member_id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))?
@@ -40,11 +40,11 @@ pub(super) async fn admin_update_member_details(
 }
 #[server(AdminDeleteMember, "/api")]
 pub(super) async fn admin_delete_member(member_id: Uuid) -> Result<(), ServerFnError> {
+    let pool = expect_context::<crate::state::AppState>().pool;
     let admin = crate::auth::session::require_admin().await?;
     if admin.id == member_id {
         return Err(ServerFnError::new("You cannot delete your own account"));
     }
-    let pool = expect_context::<crate::state::AppState>().pool;
     Member::delete(&pool, member_id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))
@@ -52,62 +52,56 @@ pub(super) async fn admin_delete_member(member_id: Uuid) -> Result<(), ServerFnE
 
 #[component]
 pub fn AdminPage() -> impl IntoView {
-    let auth_revision = expect_context::<RwSignal<u64>>();
     let current_member = expect_context::<Resource<Option<Member>>>();
-    let members = Resource::new(|| (), |_| async move { admin_list_members().await });
-    let on_member_updated = Callback::new(move |member: Member| {
-        if current_member
-            .get_untracked()
-            .flatten()
-            .is_some_and(|current| current.id == member.id)
-        {
-            auth_revision.update(|value| *value += 1);
-        }
-    });
-
     view! {
-        <section class="admin-page">
-            <header class="admin-header">
-                <p class="eyebrow">{move || tr!("admin-eyebrow")}</p>
-                <h1>{move || tr!("admin-title")}</h1>
-                <p class="lead">{move || tr!("admin-lead")}</p>
-            </header>
-
-            <Suspense fallback=move || {
-                view! { <p class="muted">{move || tr!("admin-loading")}</p> }
-            }>
-                {move || match members.get() {
-                    None => view! { <p class="muted">{move || tr!("admin-loading")}</p> }.into_any(),
-                    Some(Err(error)) => view! {
-                        <section class="admin-card" data-testid="admin-access-denied">
-                            <h2>{move || tr!("admin-access-denied-title")}</h2>
-                            <p class="form-error">{error.to_string()}</p>
-                        </section>
-                    }
-                    .into_any(),
-                    Some(Ok(member_list)) => view! {
-                        <AdminContent
-                            members=member_list
-                            current_member_id=current_member
-                                .get_untracked()
-                                .flatten()
-                                .map(|member| member.id)
-                            on_member_updated
-                        />
-                    }
-                    .into_any(),
-                }}
-            </Suspense>
-        </section>
+        <Suspense fallback=|| view! {
+            <p class="muted">{move || tr!("admin-loading")}</p>
+        }>
+            {move || match current_member.get().flatten() {
+                Some(member) if member.role == MemberRole::Admin => view! {
+                    <section class="admin-page">
+                        <header class="admin-header">
+                            <p class="eyebrow">{move || tr!("admin-eyebrow")}</p>
+                            <h1>{move || tr!("admin-title")}</h1>
+                            <p class="lead">{move || tr!("admin-lead")}</p>
+                        </header>
+                        <AdminContent current_member=member />
+                    </section>
+                }.into_any(),
+                Some(_) => view! {
+                    <section class="admin-card" data-testid="admin-access-denied">
+                        <h2>{move || tr!("admin-access-denied-title")}</h2>
+                    </section>
+                }.into_any(),
+                None => ().into_any(),
+            }}
+        </Suspense>
     }
 }
 
 #[component]
-fn AdminContent(
-    members: Vec<Member>,
-    current_member_id: Option<Uuid>,
-    on_member_updated: Callback<Member>,
-) -> impl IntoView {
+fn AdminContent(current_member: Member) -> impl IntoView {
+    let members = Resource::new(|| (), |_| async move { admin_list_members().await });
+
+    view! {
+        <Suspense fallback=|| view! {
+            <p class="muted">{move || tr!("admin-loading")}</p>
+        }>
+            {move || match members.get() {
+                Some(Ok(members)) => view! {
+                    <AdminMembersLoaded members current_member=current_member.clone() />
+                }.into_any(),
+                Some(Err(error)) => view! {
+                    <p class="form-error" role="alert">{error.to_string()}</p>
+                }.into_any(),
+                None => ().into_any(),
+            }}
+        </Suspense>
+    }
+}
+
+#[component]
+fn AdminMembersLoaded(members: Vec<Member>, current_member: Member) -> impl IntoView {
     let members = RwSignal::new(members);
     let feedback = RwSignal::new(MemberFeedback::None);
     let on_member_created = Callback::new(move |member: Member| {
@@ -116,14 +110,13 @@ fn AdminContent(
             sort_members(members);
         });
     });
-    let on_member_updated_locally = Callback::new(move |member: Member| {
+    let on_member_updated = Callback::new(move |member: Member| {
         members.update(|members| {
             if let Some(existing) = members.iter_mut().find(|existing| existing.id == member.id) {
                 *existing = member.clone();
                 sort_members(members);
             }
         });
-        on_member_updated.run(member);
     });
     let on_member_deleted = Callback::new(move |member_id| {
         members.update(|members| members.retain(|member| member.id != member_id));
@@ -136,16 +129,16 @@ fn AdminContent(
                 view! {
                     <MembersTable
                         members
-                        current_member_id
-                        on_member_updated=on_member_updated_locally
+                        current_member
+                        on_member_updated=on_member_updated
                         on_member_deleted
                         feedback
                     />
                 }
-                .into_any()
             }
         </div>
     }
+    .into_any()
 }
 
 fn sort_members(members: &mut [Member]) {
@@ -160,7 +153,7 @@ fn sort_members(members: &mut [Member]) {
 #[component]
 fn MembersTable(
     members: RwSignal<Vec<Member>>,
-    current_member_id: Option<Uuid>,
+    current_member: Member,
     on_member_updated: Callback<Member>,
     on_member_deleted: Callback<Uuid>,
     feedback: RwSignal<MemberFeedback>,
@@ -184,7 +177,7 @@ fn MembersTable(
                             each=move || members.get()
                             key=|member| member.id
                             children=move |member| {
-                                let is_current_member = current_member_id == Some(member.id);
+                                let is_current_member = current_member.id == member.id;
                                 view! {
                                     <MemberRow
                                         member

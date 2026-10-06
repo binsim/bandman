@@ -72,21 +72,24 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 
 #[cfg(feature = "ssr")]
 pub async fn require_admin() -> Result<crate::models::Member, ServerFnError> {
-    use axum_extra::extract::CookieJar;
-    use leptos_axum::extract;
-
-    let cookies: CookieJar = extract().await?;
-    let app_state = expect_context::<crate::state::AppState>();
-    let pool = &app_state.pool;
-    let member = member_from_session(pool, &cookies)
-        .await?
-        .ok_or_else(|| ServerFnError::new("Administrator access required"))?;
+    let member = require_member().await?;
 
     if member.role != crate::models::MemberRole::Admin {
         return Err(ServerFnError::new("Administrator access required"));
     }
 
     Ok(member)
+}
+
+pub async fn require_member() -> Result<crate::models::Member, ServerFnError> {
+    use axum_extra::extract::CookieJar;
+    use leptos_axum::extract;
+
+    let pool = expect_context::<crate::state::AppState>().pool;
+    let cookies: CookieJar = extract().await?;
+    member_from_session(&pool, &cookies)
+        .await?
+        .ok_or_else(|| ServerFnError::new("Sign in to use the wishlist"))
 }
 
 #[cfg(test)]

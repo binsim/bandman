@@ -36,6 +36,7 @@ sha2 = { version = "0.10", optional = true }
 hex = { version = "0.4", optional = true }
 tracing = { version = "0.1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true, features = ["env-filter"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"], optional = true }
 
 [features]
 hydrate = [
@@ -57,6 +58,7 @@ ssr = [
     "dep:hex",
     "dep:tracing",
     "dep:tracing-subscriber",
+    "dep:reqwest",
     "leptos/ssr",
     "leptos_meta/ssr",
     "leptos_router/ssr",
@@ -86,7 +88,7 @@ site-root = "target/site"
 site-pkg-dir = "pkg"
 style-file = "style/main.scss"
 assets-dir = "public"
-site-addr = "127.0.0.1:3000"
+site-addr = "0.0.0.0:3000"
 reload-port = 3001
 end2end-cmd = "npx playwright test"
 end2end-dir = "end2end"
