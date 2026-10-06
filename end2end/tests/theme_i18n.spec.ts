@@ -23,8 +23,42 @@ test.describe("theme and language", () => {
 
     await page.getByTestId("lang-de").click();
     await expect(page.getByTestId("login-title")).toHaveText("Wer bist du?");
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
 
     await page.getByTestId("lang-en").click();
     await expect(page.getByTestId("login-title")).toHaveText("Who are you?");
+    await expect(page.locator("html")).toHaveAttribute("lang", "en");
+  });
+
+  test("keeps the selected language across route loads and reloads", async ({
+    page,
+  }) => {
+    await gotoHydrated(page, "/");
+
+    await page.getByTestId("lang-de").click();
+    await expect(page.locator("h1")).toHaveText("Programm");
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("lang"))).toBe("de");
+    await expect.poll(async () =>
+      (await page.context().cookies()).find((cookie) => cookie.name === "lf-lang")
+        ?.value,
+    ).toBe("de");
+
+    await page.reload({ waitUntil: "networkidle" });
+    await expect(page.locator("h1")).toHaveText("Programm");
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
+
+    await page.getByTestId("lang-en").click();
+    await expect(page.locator("h1")).toHaveText("Program");
+  });
+
+  test("restores a stored language when no language cookie exists", async ({
+    page,
+  }) => {
+    await page.addInitScript(() => localStorage.setItem("lang", "de"));
+    await gotoHydrated(page, "/");
+
+    await expect(page.locator("h1")).toHaveText("Programm");
+    await expect(page.locator("html")).toHaveAttribute("lang", "de");
   });
 });
