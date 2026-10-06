@@ -2,8 +2,10 @@ mod create_song;
 
 use crate::models::{
     Member, WishlistCategory, WishlistFeedback, WishlistItem, WishlistMedleyFeedback,
-    WishlistSongDetails, WISHLIST_MUSICAL_KEYS,
+    WISHLIST_MUSICAL_KEYS,
 };
+#[cfg(feature = "ssr")]
+use crate::models::WishlistSongDetails;
 use leptos::prelude::*;
 use leptos_fluent::tr;
 
@@ -361,9 +363,22 @@ fn WishlistLoaded(
     provide_context(editing_medley_id);
     let editing_medley_song_ids = RwSignal::new(Vec::<uuid::Uuid>::new());
     provide_context(editing_medley_song_ids);
-    let show_needs_feedback = RwSignal::new(initial_feedback_filter(member_id));
+    let show_needs_feedback = RwSignal::new(true);
     #[cfg(feature = "hydrate")]
     let filter_storage_key = format!("bandman-wishlist-needs-feedback-{member_id}");
+    #[cfg(feature = "hydrate")]
+    {
+        let load_filter_storage_key = filter_storage_key.clone();
+        Effect::new(move |_| {
+            if let Some(window) = web_sys::window() {
+                if let Ok(Some(storage)) = window.local_storage() {
+                    if let Ok(Some(value)) = storage.get_item(&load_filter_storage_key) {
+                        show_needs_feedback.set(value != "false");
+                    }
+                }
+            }
+        });
+    }
     let on_filter_changed = Callback::new(move |show: bool| {
         show_needs_feedback.set(show);
         #[cfg(feature = "hydrate")]
@@ -603,22 +618,6 @@ fn WishlistLoaded(
         </section>
     }
     .into_any()
-}
-
-fn initial_feedback_filter(member_id: uuid::Uuid) -> bool {
-    #[cfg(feature = "hydrate")]
-    {
-        let key = format!("bandman-wishlist-needs-feedback-{member_id}");
-        if let Some(window) = web_sys::window() {
-            if let Ok(Some(storage)) = window.local_storage() {
-                if let Ok(Some(value)) = storage.get_item(&key) {
-                    return value != "false";
-                }
-            }
-        }
-    }
-    let _ = member_id;
-    true
 }
 
 #[derive(Clone, PartialEq, Eq)]
