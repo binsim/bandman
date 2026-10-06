@@ -9,7 +9,8 @@ considering and later planning them.
 
 ## Implemented
 
-- Persist a song title, optional artist and HTTP(S) link.
+- Persist a song title, optional artist, HTTP(S) link, tempo (20–300 BPM), and
+  musical key.
 - New wishes currently default to the regular song intent with no targets.
 - Show wishes alphabetically with title, artist, and resolved link-title badges.
 - Let each signed-in member set, update, or remove their own feedback for every wish.

@@ -2,6 +2,7 @@ mod create_song;
 
 use crate::models::{
     Member, WishlistCategory, WishlistFeedback, WishlistItem, WishlistMedleyFeedback,
+    WISHLIST_MUSICAL_KEYS,
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
@@ -49,11 +50,14 @@ async fn wishlist_create(
     title: String,
     artist: String,
     link: String,
+    tempo: String,
+    musical_key: String,
 ) -> Result<WishlistItem, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::auth::session::require_member().await?;
     let link_title = resolve_link_title(&link).await;
-    WishlistItem::create(
+    let tempo = parse_wishlist_tempo(&tempo)?;
+    WishlistItem::create_with_music_details(
         &pool,
         &title,
         Some(&artist),
@@ -63,6 +67,8 @@ async fn wishlist_create(
         WishlistCategory::Song,
         member.id,
         &member.name,
+        tempo,
+        Some(&musical_key),
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))
@@ -112,11 +118,14 @@ async fn wishlist_update(
     title: String,
     artist: String,
     link: String,
+    tempo: String,
+    musical_key: String,
 ) -> Result<WishlistItem, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::auth::session::require_member().await?;
     let link_title = resolve_link_title(&link).await;
-    WishlistItem::update_details(
+    let tempo = parse_wishlist_tempo(&tempo)?;
+    WishlistItem::update_details_with_music(
         &pool,
         item_id,
         member.id,
@@ -125,9 +134,23 @@ async fn wishlist_update(
         Some(&artist),
         Some(&link),
         link_title.as_deref(),
+        tempo,
+        Some(&musical_key),
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))
+}
+
+#[cfg(feature = "ssr")]
+fn parse_wishlist_tempo(value: &str) -> Result<Option<i32>, ServerFnError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    value
+        .parse::<i32>()
+        .map(Some)
+        .map_err(|_| ServerFnError::new("Tempo must be a whole number of BPM"))
 }
 
 #[server(WishlistCreateMedley, "/api")]
@@ -1521,6 +1544,8 @@ fn WishlistRow(
     let artist = RwSignal::new(item.artist.clone().unwrap_or_default());
     let link = RwSignal::new(item.link.clone().unwrap_or_default());
     let link_title = RwSignal::new(item.link_title.clone());
+    let tempo = RwSignal::new(item.tempo);
+    let musical_key = RwSignal::new(item.musical_key.clone());
     let link_badge_label = Memo::new(move |_| {
         let current_link = link.get();
         if current_link.is_empty() {
@@ -1536,6 +1561,12 @@ fn WishlistRow(
     let edit_title = RwSignal::new(item.title.clone());
     let edit_artist = RwSignal::new(item.artist.clone().unwrap_or_default());
     let edit_link = RwSignal::new(item.link.clone().unwrap_or_default());
+    let edit_tempo = RwSignal::new(
+        item.tempo
+            .map(|tempo| tempo.to_string())
+            .unwrap_or_default(),
+    );
+    let edit_musical_key = RwSignal::new(item.musical_key.clone().unwrap_or_default());
     let editing = RwSignal::new(false);
     let edit_pending = RwSignal::new(false);
     let edit_error = RwSignal::new(Option::<String>::None);
@@ -1552,13 +1583,26 @@ fn WishlistRow(
         let new_title = edit_title.get();
         let new_artist = edit_artist.get();
         let new_link = edit_link.get();
+        let new_tempo = edit_tempo.get();
+        let new_musical_key = edit_musical_key.get();
         leptos::task::spawn_local(async move {
-            match wishlist_update(item_id, new_title, new_artist, new_link).await {
+            match wishlist_update(
+                item_id,
+                new_title,
+                new_artist,
+                new_link,
+                new_tempo,
+                new_musical_key,
+            )
+            .await
+            {
                 Ok(updated) => {
                     title.set(updated.title.clone());
                     artist.set(updated.artist.clone().unwrap_or_default());
                     link.set(updated.link.clone().unwrap_or_default());
                     link_title.set(updated.link_title.clone());
+                    tempo.set(updated.tempo);
+                    musical_key.set(updated.musical_key.clone());
                     confirm_title.set(updated.title.clone());
                     on_updated.run(updated);
                     editing.set(false);
@@ -1572,6 +1616,13 @@ fn WishlistRow(
         edit_title.set(title.get());
         edit_artist.set(artist.get());
         edit_link.set(link.get());
+        edit_tempo.set(
+            tempo
+                .get()
+                .map(|tempo| tempo.to_string())
+                .unwrap_or_default(),
+        );
+        edit_musical_key.set(musical_key.get().unwrap_or_default());
         edit_error.set(None);
         editing.set(false);
     });
@@ -1618,6 +1669,14 @@ fn WishlistRow(
                             {move || link_badge_label.get().unwrap_or_default()}
                         </a>
                     </Show>
+                    <Show when=move || tempo.get().is_some()>
+                        <span class="wishlist-badge wishlist-music-detail">
+                            {move || tr!("wishlist-tempo-badge", {"tempo" => tempo.get().unwrap_or_default().to_string()})}
+                        </span>
+                    </Show>
+                    <Show when=move || musical_key.get().is_some()>
+                        <span class="wishlist-badge wishlist-music-detail">{move || musical_key.get().unwrap_or_default()}</span>
+                    </Show>
                 </div>
                 <Show when=move || !medley_management_active.get()>
                     <div class="wishlist-item-actions">
@@ -1639,12 +1698,16 @@ fn WishlistRow(
                                             edit_title.set(title.get());
                                             edit_artist.set(artist.get());
                                             edit_link.set(link.get());
+                                            edit_tempo.set(tempo.get().map(|tempo| tempo.to_string()).unwrap_or_default());
+                                            edit_musical_key.set(musical_key.get().unwrap_or_default());
                                             edit_error.set(None);
                                             editing.set(false);
                                         } else {
                                             edit_title.set(title.get());
                                             edit_artist.set(artist.get());
                                             edit_link.set(link.get());
+                                            edit_tempo.set(tempo.get().map(|tempo| tempo.to_string()).unwrap_or_default());
+                                            edit_musical_key.set(musical_key.get().unwrap_or_default());
                                             edit_error.set(None);
                                             editing.set(true);
                                         }
@@ -1716,6 +1779,37 @@ fn WishlistRow(
                             on:input=move |event| edit_link.set(event_target_value(&event))
                             disabled=move || edit_pending.get()
                         />
+                    </label>
+                    <label class="field">
+                        <span class="field-label">{move || tr!("wishlist-tempo-label")}</span>
+                        <input
+                            class="input"
+                            data-testid="wishlist-edit-tempo"
+                            type="number"
+                            min="20"
+                            max="300"
+                            step="1"
+                            placeholder="120"
+                            prop:value=move || edit_tempo.get()
+                            on:input=move |event| edit_tempo.set(event_target_value(&event))
+                            disabled=move || edit_pending.get()
+                        />
+                    </label>
+                    <label class="field">
+                        <span class="field-label">{move || tr!("wishlist-key-label")}</span>
+                        <select
+                            class="input"
+                            data-testid="wishlist-edit-key"
+                            prop:value=move || edit_musical_key.get()
+                            on:change=move |event| edit_musical_key.set(event_target_value(&event))
+                            disabled=move || edit_pending.get()
+                        >
+                            <option value="">{move || tr!("wishlist-key-unknown")}</option>
+                            {WISHLIST_MUSICAL_KEYS
+                                .iter()
+                                .map(|key| view! { <option value=*key>{*key}</option> })
+                                .collect_view()}
+                        </select>
                     </label>
                     <div class="wishlist-edit-actions">
                         <button class="btn btn-primary btn-sm" type="submit" data-testid="wishlist-save-edit" disabled=move || edit_pending.get()>

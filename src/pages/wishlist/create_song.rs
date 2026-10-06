@@ -1,3 +1,4 @@
+use super::WISHLIST_MUSICAL_KEYS;
 use crate::models::WishlistItem;
 use leptos::prelude::*;
 use leptos_fluent::tr;
@@ -10,6 +11,8 @@ pub fn CreateSong(
     let title = RwSignal::new(String::new());
     let artist = RwSignal::new(String::new());
     let link = RwSignal::new(String::new());
+    let tempo = RwSignal::new(String::new());
+    let musical_key = RwSignal::new(String::new());
     let pending = RwSignal::new(false);
     let error = RwSignal::new(Option::<String>::None);
     let matching_title = Memo::new(move |_| {
@@ -48,15 +51,27 @@ pub fn CreateSong(
         let title_value = title.get().trim().to_string();
         let artist_value = artist.get().trim().to_string();
         let link_value = link.get().trim().to_string();
+        let tempo_value = tempo.get();
+        let musical_key_value = musical_key.get();
 
         pending.set(true);
         error.set(None);
         leptos::task::spawn_local(async move {
-            match super::wishlist_create(title_value, artist_value, link_value).await {
+            match super::wishlist_create(
+                title_value,
+                artist_value,
+                link_value,
+                tempo_value,
+                musical_key_value,
+            )
+            .await
+            {
                 Ok(item) => {
                     title.set(String::new());
                     artist.set(String::new());
                     link.set(String::new());
+                    tempo.set(String::new());
+                    musical_key.set(String::new());
                     on_created.run(item);
                 }
                 Err(message) => error.set(Some(message.to_string())),
@@ -64,6 +79,10 @@ pub fn CreateSong(
             pending.set(false);
         });
     };
+    let key_options = WISHLIST_MUSICAL_KEYS
+        .iter()
+        .map(|key| view! { <option value=*key>{*key}</option> })
+        .collect_view();
 
     view! {
         <section class="wishlist-form-card">
@@ -106,6 +125,32 @@ pub fn CreateSong(
                             prop:value=move || link.get()
                             on:input=move |event| link.set(event_target_value(&event))
                         />
+                    </label>
+                    <label class="field">
+                        <span class="field-label">{move || tr!("wishlist-tempo-label")}</span>
+                        <input
+                            class="input"
+                            data-testid="wishlist-tempo"
+                            type="number"
+                            min="20"
+                            max="300"
+                            step="1"
+                            placeholder="120"
+                            prop:value=move || tempo.get()
+                            on:input=move |event| tempo.set(event_target_value(&event))
+                        />
+                    </label>
+                    <label class="field">
+                        <span class="field-label">{move || tr!("wishlist-key-label")}</span>
+                        <select
+                            class="input"
+                            data-testid="wishlist-key"
+                            prop:value=move || musical_key.get()
+                            on:change=move |event| musical_key.set(event_target_value(&event))
+                        >
+                            <option value="">{move || tr!("wishlist-key-unknown")}</option>
+                            {key_options}
+                        </select>
                     </label>
                 </div>
 

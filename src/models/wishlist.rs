@@ -5,6 +5,13 @@ use sqlx::{postgres::PgRow, FromRow, PgPool, Row};
 use std::str::FromStr;
 use uuid::Uuid;
 
+pub const WISHLIST_MUSICAL_KEYS: &[&str] = &[
+    "C major", "G major", "D major", "A major", "E major", "B major", "F# major", "C# major",
+    "F major", "Bb major", "Eb major", "Ab major", "Db major", "Gb major", "Cb major", "A minor",
+    "E minor", "B minor", "F# minor", "C# minor", "G# minor", "D# minor", "D minor", "G minor",
+    "C minor", "F minor", "Bb minor", "Eb minor", "Ab minor", "A# minor",
+];
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WishlistCategory {
@@ -61,6 +68,8 @@ pub struct WishlistItem {
     pub artist: Option<String>,
     pub link: Option<String>,
     pub link_title: Option<String>,
+    pub tempo: Option<i32>,
+    pub musical_key: Option<String>,
     pub targets: Vec<String>,
     pub category: WishlistCategory,
     pub feedback: Vec<WishlistFeedback>,
@@ -92,6 +101,10 @@ pub enum WishlistError {
     InvalidArtist,
     #[error("Link must be a valid HTTP or HTTPS URL")]
     InvalidLink,
+    #[error("Tempo must be between 20 and 300 BPM")]
+    InvalidTempo,
+    #[error("Select a valid musical key")]
+    InvalidMusicalKey,
     #[error("Provide no more than eight targets, each at most 40 characters")]
     InvalidTargets,
     #[error("This song and artist are already on the wishlist")]
@@ -140,6 +153,8 @@ impl<'r> FromRow<'r, PgRow> for WishlistItem {
             artist: row.try_get("artist")?,
             link: row.try_get("link")?,
             link_title: row.try_get("link_title")?,
+            tempo: row.try_get("tempo")?,
+            musical_key: row.try_get("musical_key")?,
             targets: row.try_get("targets")?,
             category,
             feedback: Vec::new(),
@@ -157,7 +172,7 @@ impl WishlistItem {
             SELECT item.id, item.proposed_by, membership.medley_id, membership.position AS medley_position,
                 NULLIF(count(membership.wishlist_item_id) OVER (PARTITION BY membership.medley_id), 0) AS medley_size,
                 medley.created_by AS medley_created_by, medley.name AS medley_name,
-                item.title, item.artist, item.link,
+                item.title, item.artist, item.link, item.tempo, item.musical_key,
                 item.link_title, item.targets, item.category, item.proposed_by_name, item.created_at
             FROM wishlist_items AS item
             LEFT JOIN wishlist_medley_items AS membership ON membership.wishlist_item_id = item.id
@@ -879,16 +894,36 @@ impl WishlistItem {
         link: Option<&str>,
         link_title: Option<&str>,
     ) -> Result<Self, WishlistError> {
+        Self::update_details_with_music(
+            pool, item_id, member_id, is_admin, title, artist, link, link_title, None, None,
+        )
+        .await
+    }
+
+    pub async fn update_details_with_music(
+        pool: &PgPool,
+        item_id: Uuid,
+        member_id: Uuid,
+        is_admin: bool,
+        title: &str,
+        artist: Option<&str>,
+        link: Option<&str>,
+        link_title: Option<&str>,
+        tempo: Option<i32>,
+        musical_key: Option<&str>,
+    ) -> Result<Self, WishlistError> {
         let title = validate_title(title)?;
         let artist = validate_artist(artist)?;
         let link = validate_link(link)?;
+        let tempo = validate_tempo(tempo)?;
+        let musical_key = validate_musical_key(musical_key)?;
 
         let updated = sqlx::query_as::<_, Self>(
             r#"
             UPDATE wishlist_items
-            SET title = $1, artist = $2, link = $3, link_title = $4
-            WHERE id = $5 AND (proposed_by = $6 OR $7)
-            RETURNING id, proposed_by, title, artist, link, link_title, targets,
+            SET title = $1, artist = $2, link = $3, link_title = $4, tempo = $5, musical_key = $6
+            WHERE id = $7 AND (proposed_by = $8 OR $9)
+            RETURNING id, proposed_by, title, artist, link, link_title, tempo, musical_key, targets,
                 category, proposed_by_name, created_at, NULL::UUID AS medley_id,
                 NULL::INTEGER AS medley_position, NULL::BIGINT AS medley_size,
                 NULL::UUID AS medley_created_by, NULL::TEXT AS medley_name
@@ -898,6 +933,8 @@ impl WishlistItem {
         .bind(&artist)
         .bind(&link)
         .bind(link_title)
+        .bind(tempo)
+        .bind(&musical_key)
         .bind(item_id)
         .bind(member_id)
         .bind(is_admin)
@@ -931,10 +968,42 @@ impl WishlistItem {
         member_id: Uuid,
         member_name: &str,
     ) -> Result<Self, WishlistError> {
+        Self::create_with_music_details(
+            pool,
+            title,
+            artist,
+            link,
+            link_title,
+            targets,
+            category,
+            member_id,
+            member_name,
+            None,
+            None,
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_with_music_details(
+        pool: &PgPool,
+        title: &str,
+        artist: Option<&str>,
+        link: Option<&str>,
+        link_title: Option<&str>,
+        targets: &[String],
+        category: WishlistCategory,
+        member_id: Uuid,
+        member_name: &str,
+        tempo: Option<i32>,
+        musical_key: Option<&str>,
+    ) -> Result<Self, WishlistError> {
         let title = validate_title(title)?;
         let artist = validate_artist(artist)?;
         let link = validate_link(link)?;
         let targets = validate_targets(targets)?;
+        let tempo = validate_tempo(tempo)?;
+        let musical_key = validate_musical_key(musical_key)?;
 
         let existing: bool = sqlx::query_scalar(
             r#"
@@ -957,9 +1026,9 @@ impl WishlistItem {
         sqlx::query_as::<_, Self>(
             r#"
             INSERT INTO wishlist_items
-                (id, title, artist, link, link_title, targets, category, proposed_by, proposed_by_name)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, proposed_by, title, artist, link, link_title, targets, category,
+                (id, title, artist, link, link_title, tempo, musical_key, targets, category, proposed_by, proposed_by_name)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            RETURNING id, proposed_by, title, artist, link, link_title, tempo, musical_key, targets, category,
                 proposed_by_name, created_at, NULL::UUID AS medley_id, NULL::INTEGER AS medley_position,
                 NULL::BIGINT AS medley_size, NULL::UUID AS medley_created_by, NULL::TEXT AS medley_name
             "#,
@@ -969,6 +1038,8 @@ impl WishlistItem {
         .bind(artist)
         .bind(link)
         .bind(link_title)
+        .bind(tempo)
+        .bind(&musical_key)
         .bind(targets)
         .bind(category.to_string())
         .bind(member_id)
@@ -1050,6 +1121,26 @@ fn validate_link(link: Option<&str>) -> Result<Option<String>, WishlistError> {
 }
 
 #[cfg(feature = "ssr")]
+fn validate_tempo(tempo: Option<i32>) -> Result<Option<i32>, WishlistError> {
+    match tempo {
+        Some(tempo @ 20..=300) => Ok(Some(tempo)),
+        Some(_) => Err(WishlistError::InvalidTempo),
+        None => Ok(None),
+    }
+}
+
+#[cfg(feature = "ssr")]
+fn validate_musical_key(key: Option<&str>) -> Result<Option<String>, WishlistError> {
+    let Some(key) = key.map(str::trim).filter(|key| !key.is_empty()) else {
+        return Ok(None);
+    };
+    if !WISHLIST_MUSICAL_KEYS.contains(&key) {
+        return Err(WishlistError::InvalidMusicalKey);
+    }
+    Ok(Some(key.to_string()))
+}
+
+#[cfg(feature = "ssr")]
 fn validate_targets(targets: &[String]) -> Result<Vec<String>, WishlistError> {
     let mut normalized = Vec::new();
     for target in targets {
@@ -1107,6 +1198,11 @@ mod tests {
             validate_link(Some(" https://example.com/song ")).unwrap(),
             Some("https://example.com/song".into())
         );
+        assert_eq!(validate_tempo(Some(120)).unwrap(), Some(120));
+        assert_eq!(
+            validate_musical_key(Some(" G major ")).unwrap(),
+            Some("G major".into())
+        );
         assert_eq!(
             validate_targets(&["Party".into(), "party".into(), "Slow dance".into()]).unwrap(),
             vec!["Party", "Slow dance"]
@@ -1136,6 +1232,14 @@ mod tests {
             Err(WishlistError::InvalidLink)
         ));
         assert!(matches!(
+            validate_tempo(Some(301)),
+            Err(WishlistError::InvalidTempo)
+        ));
+        assert!(matches!(
+            validate_musical_key(Some("H major")),
+            Err(WishlistError::InvalidMusicalKey)
+        ));
+        assert!(matches!(
             validate_targets(&["x".repeat(41)]),
             Err(WishlistError::InvalidTargets)
         ));
@@ -1151,7 +1255,7 @@ mod tests {
             .await
             .expect("seeded member lookup should succeed")
             .expect("migration should seed an admin");
-        let item = WishlistItem::create(
+        let item = WishlistItem::create_with_music_details(
             &pool,
             "  Song  ",
             Some("  Artist "),
@@ -1161,6 +1265,8 @@ mod tests {
             WishlistCategory::Medley,
             member.id,
             &member.name,
+            Some(124),
+            Some("G major"),
         )
         .await
         .expect("wishlist item should be saved");
@@ -1168,6 +1274,8 @@ mod tests {
         assert_eq!(item.title, "Song");
         assert_eq!(item.artist.as_deref(), Some("Artist"));
         assert_eq!(item.link_title.as_deref(), Some("Example song"));
+        assert_eq!(item.tempo, Some(124));
+        assert_eq!(item.musical_key.as_deref(), Some("G major"));
         assert_eq!(item.targets, ["party", "slow-dance"]);
         assert_eq!(item.category, WishlistCategory::Medley);
         assert!(WishlistItem::list(&pool)
@@ -1175,6 +1283,14 @@ mod tests {
             .expect("wishlist should be listed")
             .iter()
             .any(|listed| listed.id == item.id));
+        let listed = WishlistItem::list(&pool)
+            .await
+            .expect("wishlist should be listed")
+            .into_iter()
+            .find(|listed| listed.id == item.id)
+            .expect("created song should be listed");
+        assert_eq!(listed.tempo, Some(124));
+        assert_eq!(listed.musical_key.as_deref(), Some("G major"));
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -1619,7 +1735,7 @@ mod tests {
             .await,
             Err(WishlistError::DuplicateSong)
         ));
-        let updated = WishlistItem::update_details(
+        let updated = WishlistItem::update_details_with_music(
             &pool,
             item.id,
             proposer.id,
@@ -1628,6 +1744,8 @@ mod tests {
             Some("Updated artist"),
             Some("https://example.com/updated"),
             Some("Updated link title"),
+            Some(98),
+            Some("A minor"),
         )
         .await
         .expect("proposer should be able to edit their wishlist item");
@@ -1635,6 +1753,8 @@ mod tests {
         assert_eq!(updated.artist.as_deref(), Some("Updated artist"));
         assert_eq!(updated.link.as_deref(), Some("https://example.com/updated"));
         assert_eq!(updated.link_title.as_deref(), Some("Updated link title"));
+        assert_eq!(updated.tempo, Some(98));
+        assert_eq!(updated.musical_key.as_deref(), Some("A minor"));
 
         let admin_updated = WishlistItem::update_details(
             &pool,
