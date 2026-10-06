@@ -1,11 +1,11 @@
 mod create_song;
 
+#[cfg(feature = "ssr")]
+use crate::models::WishlistSongDetails;
 use crate::models::{
     Member, WishlistCategory, WishlistFeedback, WishlistItem, WishlistMedleyFeedback,
     WISHLIST_MUSICAL_KEYS,
 };
-#[cfg(feature = "ssr")]
-use crate::models::WishlistSongDetails;
 use leptos::prelude::*;
 use leptos_fluent::tr;
 
