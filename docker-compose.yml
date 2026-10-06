@@ -16,7 +16,7 @@ services:
       retries: 10
 
   app:
-    build: .
+    image: ghcr.io/binsim/bandman:latest
     ports:
       - "3000:3000"
     environment:
