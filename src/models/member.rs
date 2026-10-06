@@ -92,39 +92,6 @@ impl<'r> FromRow<'r, PgRow> for Member {
 impl Member {
     const ADMIN_MUTATION_LOCK: i64 = 6_204_119_021;
 
-    pub async fn wishlist_show_needs_feedback(
-        pool: &PgPool,
-        member_id: Uuid,
-    ) -> Result<bool, MemberError> {
-        Ok(sqlx::query_scalar(
-            "SELECT wishlist_show_needs_feedback FROM members WHERE id = $1 AND active = TRUE",
-        )
-        .bind(member_id)
-        .fetch_optional(pool)
-        .await?
-        .ok_or(MemberError::NotFound)?)
-    }
-
-    pub async fn set_wishlist_show_needs_feedback(
-        pool: &PgPool,
-        member_id: Uuid,
-        show_needs_feedback: bool,
-    ) -> Result<(), MemberError> {
-        let updated = sqlx::query(
-            "UPDATE members SET wishlist_show_needs_feedback = $1 WHERE id = $2 AND active = TRUE",
-        )
-        .bind(show_needs_feedback)
-        .bind(member_id)
-        .execute(pool)
-        .await?
-        .rows_affected();
-        if updated == 1 {
-            Ok(())
-        } else {
-            Err(MemberError::NotFound)
-        }
-    }
-
     pub async fn list_active(pool: &PgPool) -> Result<Vec<Self>, MemberError> {
         Ok(sqlx::query_as::<_, Member>(
             r#"
@@ -388,41 +355,6 @@ mod tests {
                 MemberRole::Participant => assert_role_persists(&pool, role).await,
             }
         }
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn wishlist_filter_preference_is_saved_per_member(pool: PgPool) {
-        let first = Member::create(
-            &pool,
-            &format!("Filter preference {}", Uuid::new_v4()),
-            MemberRole::Member,
-        )
-        .await
-        .expect("member should be created");
-        let second = Member::create(
-            &pool,
-            &format!("Filter preference {}", Uuid::new_v4()),
-            MemberRole::Member,
-        )
-        .await
-        .expect("member should be created");
-
-        assert!(Member::wishlist_show_needs_feedback(&pool, first.id)
-            .await
-            .expect("default preference should load"));
-        assert!(Member::wishlist_show_needs_feedback(&pool, second.id)
-            .await
-            .expect("second preference should load"));
-
-        Member::set_wishlist_show_needs_feedback(&pool, first.id, false)
-            .await
-            .expect("preference should save");
-        assert!(!Member::wishlist_show_needs_feedback(&pool, first.id)
-            .await
-            .expect("updated preference should load"));
-        assert!(Member::wishlist_show_needs_feedback(&pool, second.id)
-            .await
-            .expect("other member preference should be unchanged"));
     }
 
     #[test]

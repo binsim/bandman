@@ -13,17 +13,13 @@ use create_song::CreateSong;
 struct WishlistPageData {
     items: Vec<WishlistItem>,
     medley_feedback: Vec<WishlistMedleyFeedback>,
-    show_needs_feedback: bool,
 }
 
 #[server(WishlistList, "/api")]
 async fn wishlist_list() -> Result<WishlistPageData, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
-    let member = crate::auth::session::require_member().await?;
+    crate::auth::session::require_member().await?;
     let items = WishlistItem::list(&pool)
-        .await
-        .map_err(|error| ServerFnError::new(error.to_string()))?;
-    let show_needs_feedback = Member::wishlist_show_needs_feedback(&pool, member.id)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))?;
     let medley_feedback = WishlistItem::list_medley_feedback(&pool)
@@ -32,17 +28,7 @@ async fn wishlist_list() -> Result<WishlistPageData, ServerFnError> {
     Ok(WishlistPageData {
         items,
         medley_feedback,
-        show_needs_feedback,
     })
-}
-
-#[server(WishlistSetFeedbackFilter, "/api")]
-async fn wishlist_set_feedback_filter(show_needs_feedback: bool) -> Result<(), ServerFnError> {
-    let pool = expect_context::<crate::state::AppState>().pool;
-    let member = crate::auth::session::require_member().await?;
-    Member::set_wishlist_show_needs_feedback(&pool, member.id, show_needs_feedback)
-        .await
-        .map_err(|error| ServerFnError::new(error.to_string()))
 }
 
 #[server(WishlistCreate, "/api")]
@@ -339,7 +325,6 @@ fn WishlistContent(current_member: Member) -> impl IntoView {
                     <WishlistLoaded
                         initial_items=data.items
                         initial_medley_feedback=data.medley_feedback
-                        initial_show_needs_feedback=data.show_needs_feedback
                         member_id=current_member.id
                         can_delete_all=current_member.role == crate::models::MemberRole::Admin
                     />
@@ -361,7 +346,6 @@ fn WishlistContent(current_member: Member) -> impl IntoView {
 fn WishlistLoaded(
     initial_items: Vec<WishlistItem>,
     initial_medley_feedback: Vec<WishlistMedleyFeedback>,
-    initial_show_needs_feedback: bool,
     member_id: uuid::Uuid,
     can_delete_all: bool,
 ) -> AnyView {
@@ -373,24 +357,20 @@ fn WishlistLoaded(
     provide_context(editing_medley_id);
     let editing_medley_song_ids = RwSignal::new(Vec::<uuid::Uuid>::new());
     provide_context(editing_medley_song_ids);
-    let show_needs_feedback = RwSignal::new(initial_show_needs_feedback);
-    let filter_pending = RwSignal::new(false);
-    let filter_error = RwSignal::new(Option::<String>::None);
+    let show_needs_feedback = RwSignal::new(initial_feedback_filter(member_id));
+    #[cfg(feature = "hydrate")]
+    let filter_storage_key = format!("bandman-wishlist-needs-feedback-{member_id}");
     let on_filter_changed = Callback::new(move |show: bool| {
-        if filter_pending.get() || show_needs_feedback.get() == show {
-            return;
-        }
-        let previous = show_needs_feedback.get();
         show_needs_feedback.set(show);
-        filter_pending.set(true);
-        filter_error.set(None);
-        leptos::task::spawn_local(async move {
-            if let Err(message) = wishlist_set_feedback_filter(show).await {
-                show_needs_feedback.set(previous);
-                filter_error.set(Some(message.to_string()));
+        #[cfg(feature = "hydrate")]
+        {
+            if let Some(window) = web_sys::window() {
+                if let Ok(Some(storage)) = window.local_storage() {
+                    let _ =
+                        storage.set_item(&filter_storage_key, if show { "true" } else { "false" });
+                }
             }
-            filter_pending.set(false);
-        });
+        }
     });
     let selecting_medley = RwSignal::new(false);
     let new_medley_name = RwSignal::new(String::new());
@@ -603,8 +583,6 @@ fn WishlistLoaded(
                 member_id
                 can_delete_all
                 show_needs_feedback
-                filter_pending
-                filter_error
                 on_filter_changed
                 selecting_medley
                 new_medley_name
@@ -621,6 +599,22 @@ fn WishlistLoaded(
         </section>
     }
     .into_any()
+}
+
+fn initial_feedback_filter(member_id: uuid::Uuid) -> bool {
+    #[cfg(feature = "hydrate")]
+    {
+        let key = format!("bandman-wishlist-needs-feedback-{member_id}");
+        if let Some(window) = web_sys::window() {
+            if let Ok(Some(storage)) = window.local_storage() {
+                if let Ok(Some(value)) = storage.get_item(&key) {
+                    return value != "false";
+                }
+            }
+        }
+    }
+    let _ = member_id;
+    true
 }
 
 #[derive(Clone, PartialEq, Eq)]
@@ -663,8 +657,6 @@ fn WishlistListing(
     member_id: uuid::Uuid,
     can_delete_all: bool,
     show_needs_feedback: RwSignal<bool>,
-    filter_pending: RwSignal<bool>,
-    filter_error: RwSignal<Option<String>>,
     on_filter_changed: Callback<bool>,
     selecting_medley: RwSignal<bool>,
     new_medley_name: RwSignal<String>,
@@ -686,7 +678,6 @@ fn WishlistListing(
                 <WishlistListHeader
                     items
                     show_needs_feedback
-                    filter_pending
                     on_filter_changed
                     selecting_medley
                     on_start_creating_medley
@@ -702,9 +693,6 @@ fn WishlistListing(
             />
             <Show when=move || medley_error.get().is_some()>
                 <p class="form-error" role="alert">{move || medley_error.get().unwrap_or_default()}</p>
-            </Show>
-            <Show when=move || filter_error.get().is_some()>
-                <p class="form-error" role="alert">{move || filter_error.get().unwrap_or_default()}</p>
             </Show>
             <Show
                 when=move || !items.get().is_empty()
@@ -741,7 +729,6 @@ fn WishlistListing(
 fn WishlistListHeader(
     items: RwSignal<Vec<WishlistItem>>,
     show_needs_feedback: RwSignal<bool>,
-    filter_pending: RwSignal<bool>,
     on_filter_changed: Callback<bool>,
     selecting_medley: RwSignal<bool>,
     on_start_creating_medley: Callback<()>,
@@ -756,7 +743,6 @@ fn WishlistListHeader(
                     type="button"
                     aria-pressed=move || show_needs_feedback.get().to_string()
                     on:click=move |_| on_filter_changed.run(true)
-                    disabled=move || filter_pending.get()
                 >
                     {move || tr!("wishlist-filter-needs-feedback")}
                 </button>
@@ -766,7 +752,6 @@ fn WishlistListHeader(
                     type="button"
                     aria-pressed=move || (!show_needs_feedback.get()).to_string()
                     on:click=move |_| on_filter_changed.run(false)
-                    disabled=move || filter_pending.get()
                 >
                     {move || tr!("wishlist-filter-all")}
                 </button>

@@ -29,8 +29,8 @@ considering and later planning them.
   when a song does not fit in the medley.
 - Allow the proposer to delete their wish and admins to delete any wish.
 - Allow the proposer and admins to edit the song title, artist, and link.
-- Remember each member's choice of showing all wishes or only wishes needing
-  their feedback.
+- Remember each browser's per-member choice of showing all wishes or only
+  wishes needing their feedback in local storage.
 - Collapse and expand medley groups while keeping their ordered songs intact.
 - Require an active member session to view or add wishes.
 
