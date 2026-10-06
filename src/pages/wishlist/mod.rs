@@ -2,7 +2,7 @@ mod create_song;
 
 use crate::models::{
     Member, WishlistCategory, WishlistFeedback, WishlistItem, WishlistMedleyFeedback,
-    WISHLIST_MUSICAL_KEYS,
+    WishlistSongDetails, WISHLIST_MUSICAL_KEYS,
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
@@ -45,16 +45,18 @@ async fn wishlist_create(
     let tempo = parse_wishlist_tempo(&tempo)?;
     WishlistItem::create_with_music_details(
         &pool,
-        &title,
-        Some(&artist),
-        Some(&link),
-        link_title.as_deref(),
+        WishlistSongDetails {
+            title: &title,
+            artist: Some(&artist),
+            link: Some(&link),
+            link_title: link_title.as_deref(),
+            tempo,
+            musical_key: Some(&musical_key),
+        },
         &[],
         WishlistCategory::Song,
         member.id,
         &member.name,
-        tempo,
-        Some(&musical_key),
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))
@@ -116,12 +118,14 @@ async fn wishlist_update(
         item_id,
         member.id,
         member.role == crate::models::MemberRole::Admin,
-        &title,
-        Some(&artist),
-        Some(&link),
-        link_title.as_deref(),
-        tempo,
-        Some(&musical_key),
+        WishlistSongDetails {
+            title: &title,
+            artist: Some(&artist),
+            link: Some(&link),
+            link_title: link_title.as_deref(),
+            tempo,
+            musical_key: Some(&musical_key),
+        },
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))
@@ -619,7 +623,7 @@ fn initial_feedback_filter(member_id: uuid::Uuid) -> bool {
 
 #[derive(Clone, PartialEq, Eq)]
 enum WishlistDisplayEntry {
-    Song(WishlistItem),
+    Song(Box<WishlistItem>),
     Medley { id: uuid::Uuid },
 }
 
@@ -637,12 +641,12 @@ fn group_wishlist_items(items: Vec<WishlistItem>) -> Vec<WishlistDisplayEntry> {
     let mut medley_indices = std::collections::HashMap::new();
     for item in items {
         let Some(medley_id) = item.medley_id else {
-            entries.push(WishlistDisplayEntry::Song(item));
+            entries.push(WishlistDisplayEntry::Song(Box::new(item)));
             continue;
         };
-        if !medley_indices.contains_key(&medley_id) {
+        if let std::collections::hash_map::Entry::Vacant(entry) = medley_indices.entry(medley_id) {
             let index = entries.len();
-            medley_indices.insert(medley_id, index);
+            entry.insert(index);
             entries.push(WishlistDisplayEntry::Medley { id: medley_id });
         }
     }
@@ -965,7 +969,7 @@ fn WishlistListEntry(
     match entry {
         WishlistDisplayEntry::Song(item) => view! {
             <WishlistListItem
-                item
+                item=*item
                 member_id
                 can_delete_all
                 selecting_medley

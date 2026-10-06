@@ -12,6 +12,16 @@ pub const WISHLIST_MUSICAL_KEYS: &[&str] = &[
     "C minor", "F minor", "Bb minor", "Eb minor", "Ab minor", "A# minor",
 ];
 
+#[derive(Debug, Clone, Copy)]
+pub struct WishlistSongDetails<'a> {
+    pub title: &'a str,
+    pub artist: Option<&'a str>,
+    pub link: Option<&'a str>,
+    pub link_title: Option<&'a str>,
+    pub tempo: Option<i32>,
+    pub musical_key: Option<&'a str>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WishlistCategory {
@@ -884,6 +894,7 @@ impl WishlistItem {
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_details(
         pool: &PgPool,
         item_id: Uuid,
@@ -895,7 +906,18 @@ impl WishlistItem {
         link_title: Option<&str>,
     ) -> Result<Self, WishlistError> {
         Self::update_details_with_music(
-            pool, item_id, member_id, is_admin, title, artist, link, link_title, None, None,
+            pool,
+            item_id,
+            member_id,
+            is_admin,
+            WishlistSongDetails {
+                title,
+                artist,
+                link,
+                link_title,
+                tempo: None,
+                musical_key: None,
+            },
         )
         .await
     }
@@ -905,18 +927,13 @@ impl WishlistItem {
         item_id: Uuid,
         member_id: Uuid,
         is_admin: bool,
-        title: &str,
-        artist: Option<&str>,
-        link: Option<&str>,
-        link_title: Option<&str>,
-        tempo: Option<i32>,
-        musical_key: Option<&str>,
+        details: WishlistSongDetails<'_>,
     ) -> Result<Self, WishlistError> {
-        let title = validate_title(title)?;
-        let artist = validate_artist(artist)?;
-        let link = validate_link(link)?;
-        let tempo = validate_tempo(tempo)?;
-        let musical_key = validate_musical_key(musical_key)?;
+        let title = validate_title(details.title)?;
+        let artist = validate_artist(details.artist)?;
+        let link = validate_link(details.link)?;
+        let tempo = validate_tempo(details.tempo)?;
+        let musical_key = validate_musical_key(details.musical_key)?;
 
         let updated = sqlx::query_as::<_, Self>(
             r#"
@@ -932,7 +949,7 @@ impl WishlistItem {
         .bind(&title)
         .bind(&artist)
         .bind(&link)
-        .bind(link_title)
+        .bind(details.link_title)
         .bind(tempo)
         .bind(&musical_key)
         .bind(item_id)
@@ -957,6 +974,7 @@ impl WishlistItem {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn create(
         pool: &PgPool,
         title: &str,
@@ -970,40 +988,36 @@ impl WishlistItem {
     ) -> Result<Self, WishlistError> {
         Self::create_with_music_details(
             pool,
-            title,
-            artist,
-            link,
-            link_title,
+            WishlistSongDetails {
+                title,
+                artist,
+                link,
+                link_title,
+                tempo: None,
+                musical_key: None,
+            },
             targets,
             category,
             member_id,
             member_name,
-            None,
-            None,
         )
         .await
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub async fn create_with_music_details(
         pool: &PgPool,
-        title: &str,
-        artist: Option<&str>,
-        link: Option<&str>,
-        link_title: Option<&str>,
+        details: WishlistSongDetails<'_>,
         targets: &[String],
         category: WishlistCategory,
         member_id: Uuid,
         member_name: &str,
-        tempo: Option<i32>,
-        musical_key: Option<&str>,
     ) -> Result<Self, WishlistError> {
-        let title = validate_title(title)?;
-        let artist = validate_artist(artist)?;
-        let link = validate_link(link)?;
+        let title = validate_title(details.title)?;
+        let artist = validate_artist(details.artist)?;
+        let link = validate_link(details.link)?;
         let targets = validate_targets(targets)?;
-        let tempo = validate_tempo(tempo)?;
-        let musical_key = validate_musical_key(musical_key)?;
+        let tempo = validate_tempo(details.tempo)?;
+        let musical_key = validate_musical_key(details.musical_key)?;
 
         let existing: bool = sqlx::query_scalar(
             r#"
@@ -1037,7 +1051,7 @@ impl WishlistItem {
         .bind(title)
         .bind(artist)
         .bind(link)
-        .bind(link_title)
+        .bind(details.link_title)
         .bind(tempo)
         .bind(&musical_key)
         .bind(targets)
@@ -1257,16 +1271,18 @@ mod tests {
             .expect("migration should seed an admin");
         let item = WishlistItem::create_with_music_details(
             &pool,
-            "  Song  ",
-            Some("  Artist "),
-            Some("https://example.com/song"),
-            Some("Example song"),
+            WishlistSongDetails {
+                title: "  Song  ",
+                artist: Some("  Artist "),
+                link: Some("https://example.com/song"),
+                link_title: Some("Example song"),
+                tempo: Some(124),
+                musical_key: Some("G major"),
+            },
             &["party".into(), "slow-dance".into()],
             WishlistCategory::Medley,
             member.id,
             &member.name,
-            Some(124),
-            Some("G major"),
         )
         .await
         .expect("wishlist item should be saved");
@@ -1740,12 +1756,14 @@ mod tests {
             item.id,
             proposer.id,
             false,
-            "Renamed title",
-            Some("Updated artist"),
-            Some("https://example.com/updated"),
-            Some("Updated link title"),
-            Some(98),
-            Some("A minor"),
+            WishlistSongDetails {
+                title: "Renamed title",
+                artist: Some("Updated artist"),
+                link: Some("https://example.com/updated"),
+                link_title: Some("Updated link title"),
+                tempo: Some(98),
+                musical_key: Some("A minor"),
+            },
         )
         .await
         .expect("proposer should be able to edit their wishlist item");
