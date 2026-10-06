@@ -38,11 +38,17 @@ test.describe("theme and language", () => {
     await page.getByTestId("lang-de").click();
     await expect(page.locator("h1")).toHaveText("Programm");
     await expect(page.locator("html")).toHaveAttribute("lang", "de");
-    await expect.poll(() => page.evaluate(() => localStorage.getItem("lang"))).toBe("de");
-    await expect.poll(async () =>
-      (await page.context().cookies()).find((cookie) => cookie.name === "lf-lang")
-        ?.value,
-    ).toBe("de");
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("lang")))
+      .toBe("de");
+    await expect
+      .poll(
+        async () =>
+          (await page.context().cookies()).find(
+            (cookie) => cookie.name === "lf-lang",
+          )?.value,
+      )
+      .toBe("de");
 
     await page.reload({ waitUntil: "networkidle" });
     await expect(page.locator("h1")).toHaveText("Programm");
