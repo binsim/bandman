@@ -6,13 +6,15 @@ use crate::pages::{
 };
 use leptos::prelude::*;
 use leptos_fluent::{leptos_fluent, I18n};
-use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
+use leptos_meta::{provide_meta_context, MetaTags, Title};
 use leptos_router::{
     components::{Route, Router, Routes},
     StaticSegment,
 };
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
+    let stylesheet_href = stylesheet_href(&options);
+
     view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -22,6 +24,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <AutoReload options=options.clone()/>
                 <HydrationScripts options/>
                 <MetaTags/>
+                <link rel="stylesheet" href=stylesheet_href/>
                 <link rel="preconnect" href="https://fonts.googleapis.com"/>
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
                 <link
@@ -36,13 +39,39 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     }
 }
 
+fn stylesheet_href(options: &LeptosOptions) -> String {
+    if options.hash_files {
+        let hash_path = std::env::current_exe()
+            .expect("failed to locate application executable")
+            .parent()
+            .expect("application executable has no parent directory")
+            .join(options.hash_file.as_ref());
+        let hashes = std::fs::read_to_string(&hash_path).expect("failed to read asset hash file");
+        let css_hash = hashes
+            .lines()
+            .find_map(|line| {
+                let (asset, hash) = line.split_once(':')?;
+                (asset.trim() == "css").then_some(hash.trim())
+            })
+            .expect("CSS hash missing from asset hash file");
+
+        format!(
+            "{}{}.{}.css",
+            options.site_pkg_dir_route_base(),
+            options.output_name,
+            css_hash
+        )
+    } else {
+        options.css_path()
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
     provide_theme();
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/bandman.css"/>
         <Title text="Bandman"/>
         <ThemeRoot>
             <I18nProvider>
