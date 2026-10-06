@@ -5,14 +5,16 @@ use crate::pages::{
     wishlist::WishlistPage,
 };
 use leptos::prelude::*;
-use leptos_fluent::leptos_fluent;
-use leptos_meta::{provide_meta_context, MetaTags, Stylesheet, Title};
+use leptos_fluent::{leptos_fluent, I18n};
+use leptos_meta::{provide_meta_context, MetaTags, Title};
 use leptos_router::{
     components::{Route, Router, Routes},
     StaticSegment,
 };
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {
+    let stylesheet_href = stylesheet_href(&options);
+
     view! {
         <!DOCTYPE html>
         <html lang="en">
@@ -22,6 +24,7 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
                 <AutoReload options=options.clone()/>
                 <HydrationScripts options/>
                 <MetaTags/>
+                <link rel="stylesheet" href=stylesheet_href/>
                 <link rel="preconnect" href="https://fonts.googleapis.com"/>
                 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
                 <link
@@ -36,13 +39,39 @@ pub fn shell(options: LeptosOptions) -> impl IntoView {
     }
 }
 
+fn stylesheet_href(options: &LeptosOptions) -> String {
+    if options.hash_files {
+        let hash_path = std::env::current_exe()
+            .expect("failed to locate application executable")
+            .parent()
+            .expect("application executable has no parent directory")
+            .join(options.hash_file.as_ref());
+        let hashes = std::fs::read_to_string(&hash_path).expect("failed to read asset hash file");
+        let css_hash = hashes
+            .lines()
+            .find_map(|line| {
+                let (asset, hash) = line.split_once(':')?;
+                (asset.trim() == "css").then_some(hash.trim())
+            })
+            .expect("CSS hash missing from asset hash file");
+
+        format!(
+            "{}{}.{}.css",
+            options.site_pkg_dir_route_base(),
+            options.output_name,
+            css_hash
+        )
+    } else {
+        options.css_path()
+    }
+}
+
 #[component]
 pub fn App() -> impl IntoView {
     provide_meta_context();
     provide_theme();
 
     view! {
-        <Stylesheet id="leptos" href="/pkg/bandman.css"/>
         <Title text="Bandman"/>
         <ThemeRoot>
             <I18nProvider>
@@ -72,12 +101,56 @@ pub fn App() -> impl IntoView {
 #[component]
 fn I18nProvider(children: Children) -> impl IntoView {
     leptos_fluent! {
-        children: children(),
+        children: view! {
+            <LanguagePreferenceSync/>
+            {children()}
+        },
         locales: "./locales",
         default_language: "en",
         sync_html_tag_lang: true,
-        initial_language_from_local_storage: true,
-        set_language_to_local_storage: true,
-        initial_language_from_navigator: true,
+        initial_language_from_cookie: true,
+        initial_language_from_accept_language_header: true,
+        cookie_name: "lf-lang",
+        cookie_attrs: "Path=/; Max-Age=31536000; SameSite=Lax",
+        local_storage_key: "lang",
     }
+}
+
+#[component]
+fn LanguagePreferenceSync() -> impl IntoView {
+    let i18n = expect_context::<I18n>();
+
+    #[cfg(feature = "hydrate")]
+    Effect::new(move |_| {
+        if leptos_fluent::cookie::get("lf-lang").is_some() {
+            return;
+        }
+        let Some(language_id) = leptos_fluent::local_storage::get("lang") else {
+            return;
+        };
+        if let Some(language) = i18n
+            .languages
+            .iter()
+            .find(|language| language.id == language_id)
+        {
+            i18n.language.set(*language);
+            persist_language(language.id);
+        }
+    });
+
+    let _ = i18n;
+    ().into_view()
+}
+
+pub(crate) fn persist_language(language_id: &str) {
+    #[cfg(feature = "hydrate")]
+    {
+        leptos_fluent::local_storage::set("lang", language_id);
+        leptos_fluent::cookie::set(
+            "lf-lang",
+            language_id,
+            "Path=/; Max-Age=31536000; SameSite=Lax",
+        );
+    }
+    let _ = language_id;
 }

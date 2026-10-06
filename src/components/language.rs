@@ -8,11 +8,13 @@ pub fn LanguageSwitcher() -> impl IntoView {
     let set_en = move |_| {
         if let Some(lang) = i18n.languages.iter().find(|l| l.id == "en") {
             i18n.language.set(*lang);
+            crate::app::persist_language(lang.id);
         }
     };
     let set_de = move |_| {
         if let Some(lang) = i18n.languages.iter().find(|l| l.id == "de") {
             i18n.language.set(*lang);
+            crate::app::persist_language(lang.id);
         }
     };
 
