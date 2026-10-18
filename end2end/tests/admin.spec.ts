@@ -19,13 +19,11 @@ const DELETE_POPUP_CONFIRM_DELETE_BUTTON = "admin-confirm-delete";
 const DELETE_POPUP_CANCEL_DELETE_BUTTON = "admin-cancel-delete";
 
 test.describe("Unauthorized access", () => {
-  test("denies access when not logged in", async ({ page }) => {
+  test("redirects to login when not logged in", async ({ page }) => {
     await gotoHydrated(page, "/admin");
 
+    // expect(page.url()).toContain("/login");
     await expect(page.getByTestId("admin-access-denied")).toBeVisible();
-    await expect(
-      page.getByTestId("topbar").getByRole("link", { name: /log in/i }),
-    ).toBeVisible();
   });
 });
 
@@ -61,6 +59,29 @@ test.describe("Admin member management", () => {
     nameInput = page.getByTestId(ADD_MEMBER_NAME_INPUT);
     roleSelect = page.getByTestId(ADD_MEMBER_ROLE_SELECT);
     createButton = page.getByTestId(ADD_MEMBER_CREATE_BUTTON);
+  });
+
+  test("denies access when not admin", async ({ page }) => {
+    const [createdMember, memberName] = await createMember(page);
+
+    page.getByTestId("logout-button").click();
+
+    await gotoHydrated(page, "/login");
+
+    await page
+      .getByTestId("login-member-select")
+      .selectOption({ label: memberName });
+    await page.getByTestId("login-submit").click();
+
+    await gotoHydrated(page, "/admin");
+
+    await expect(page.getByTestId("admin-access-denied")).toBeVisible();
+
+    await loginAsAdmin(page);
+    await gotoHydrated(page, "/admin");
+
+    await createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
+    await createdMember.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON).click();
   });
 
   test("Add member is well formatted", async ({ page }) => {

@@ -68,12 +68,11 @@ pub fn AdminPage() -> impl IntoView {
                         <AdminContent current_member=member />
                     </section>
                 }.into_any(),
-                Some(_) => view! {
+                _ => view! {
                     <section class="admin-card" data-testid="admin-access-denied">
                         <h2>{move || tr!("admin-access-denied-title")}</h2>
                     </section>
                 }.into_any(),
-                None => ().into_any(),
             }}
         </Suspense>
     }
