@@ -25,8 +25,8 @@ pub fn AppShell(children: Children) -> impl IntoView {
                     <span class="brand-name" data-testid="brand-name">"Bandman"</span>
                 </A>
                 <Suspense fallback=|| ()>
-                    {move || match member.get() {
-                        Some(Some(m)) => view! {
+                    {move || match member.get().flatten() {
+                        Some(m) => view! {
                             <nav class="topbar-nav" aria-label="Main">
                                 <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
                                 <A href="/plan">{move || tr!("nav-plan")}</A>
