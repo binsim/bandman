@@ -25,11 +25,23 @@ pub fn AppShell(children: Children) -> impl IntoView {
                     <span class="brand-name" data-testid="brand-name">"Bandman"</span>
                 </A>
                 <Suspense fallback=|| ()>
-                    {move || match member.get() {
-                        Some(member) => {
-                            let role = member.as_ref().map(|m| m.role);
-                            view! { <AppNavigation role /> }.into_any()
-                        }
+                    {move || match member.get().flatten() {
+                        Some(m) => view! {
+                            <nav class="topbar-nav" aria-label="Main">
+                                <A href="/wishlist">{move || tr!("nav-wishlist")}</A>
+                                <A href="/plan">{move || tr!("nav-plan")}</A>
+                                {if m.role == MemberRole::Participant || m.role == MemberRole::Admin {
+                                    view! { <A href="/finance">{move || tr!("nav-finance")}</A> }.into_any()
+                                } else {
+                                    ().into_any()
+                                }}
+                                {if m.role == MemberRole::Admin {
+                                    view! { <A href="/admin">{move || tr!("nav-admin")}</A> }.into_any()
+                                } else {
+                                    ().into_any()
+                                }}
+                            </nav>
+                        }.into_any(),
                         None => ().into_any(),
                     }}
                 </Suspense>
