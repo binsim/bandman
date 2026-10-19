@@ -120,99 +120,6 @@ a {
   font-size: 1.05rem;
 }
 
-.topbar-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  flex: 1;
-
-  a {
-    color: var(--color-text-muted);
-    font-size: 0.92rem;
-    font-weight: 500;
-    padding: var(--space-1) var(--space-2);
-    border-radius: var(--radius-sm);
-    transition: color var(--transition), background var(--transition);
-
-    &:hover,
-    &[aria-current="page"] {
-      color: var(--color-text);
-      background: var(--color-accent-soft);
-    }
-  }
-}
-
-.mobile-nav {
-  display: none;
-  position: relative;
-}
-
-.mobile-nav-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 0;
-  border: 0;
-  background: transparent;
-  font: inherit;
-  cursor: pointer;
-}
-
-.mobile-nav-backdrop {
-  position: fixed;
-  z-index: 1;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: default;
-}
-
-.mobile-nav-menu {
-  position: absolute;
-  z-index: 2;
-  top: calc(100% + var(--space-2));
-  left: 0;
-  display: grid;
-  gap: var(--space-1);
-  min-width: 12rem;
-  padding: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-raised);
-  box-shadow: var(--shadow-card);
-
-  a {
-    padding: var(--space-2) var(--space-3);
-    border-radius: var(--radius-sm);
-    color: var(--color-text);
-
-    &:hover,
-    &[aria-current="page"] {
-      background: var(--color-accent-soft);
-    }
-  }
-}
-
-.topbar-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 0.25rem;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-raised);
-  box-shadow: 0 2px 8px var(--color-shadow);
-}
-
-.topbar-actions > .theme-toggle {
-  margin-left: var(--space-1);
-  border-left: 1px solid var(--color-border);
-  border-radius: 0;
-}
 
 .session-controls {
   display: flex;
@@ -1342,425 +1249,77 @@ a {
   border: 0;
 }
 
-@media (min-width: 1024px) {
-  .admin-create-form {
-    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 0.7fr) auto;
-  }
-
-  .wishlist-form-fields {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .topbar {
-    padding-inline: var(--space-6);
-  }
+.user-icon-container {
+    position: relative;
+    margin-left: auto;
 }
 
-@media (max-width: 1023px) {
-  .topbar {
-    display: grid;
-    grid-template-areas:
-      "brand brand"
-      "actions actions";
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: var(--space-2) var(--space-3);
-    padding: var(--space-2) var(--space-3);
-    backdrop-filter: none;
-  }
-
-  .topbar > .brand {
-    display: none;
-  }
-
-  .topbar-nav {
-    display: none;
-  }
-
-  .mobile-nav {
-    display: block;
-    grid-area: brand;
-    justify-self: start;
-  }
-
-  .topbar-actions {
-    grid-area: actions;
-    justify-self: end;
-    margin-left: 0;
-    max-width: 100%;
-  }
-
-  .session-controls {
-    padding-left: var(--space-2);
-    margin-left: var(--space-1);
-  }
-
-  .session-name {
-    max-width: 7rem;
-  }
-}
-
-@media (max-width: 380px) {
-  .topbar-actions {
-    padding: 0.15rem;
-  }
-
-  .session-name {
-    max-width: 5rem;
-  }
-
-  .session-controls .btn,
-  .topbar-actions > .theme-toggle {
-    padding-inline: 0.4rem;
-  }
-
-  .topbar-actions > .theme-toggle {
-    margin-left: 0.15rem;
-  }
-}
-
-@media (max-width: 640px) {
-  .wishlist-list-header {
-    align-items: flex-start;
-  }
-
-  .wishlist-list-header-actions {
-    align-items: center;
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: var(--space-2);
-  }
-
-  .wishlist-filter {
-    justify-content: flex-start;
-  }
-
-  .wishlist-filter-button {
-    min-height: 2.5rem;
-  }
-
-  .wishlist-item-line {
-    align-items: stretch;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .wishlist-item:not(.is-medley) {
-    padding-top: var(--space-3);
-  }
-
-  .wishlist-item:not(.is-medley) .wishlist-item-line {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--space-2);
-  }
-
-  .wishlist-item:not(.is-medley) .wishlist-song-summary {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .wishlist-item:not(.is-medley) .wishlist-item-actions {
-    position: static;
-    align-items: flex-end;
-    flex-direction: column;
-    grid-column: 2;
-    grid-row: 1;
-    width: 100%;
-  }
-
-  .wishlist-song-summary {
-    width: 100%;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-2);
-  }
-
-  .wishlist-song-summary h3 {
-    width: 100%;
-    max-width: 100%;
-    flex: 1 1 100%;
-    overflow: visible;
-    overflow-wrap: anywhere;
-    text-overflow: clip;
-    white-space: normal;
-  }
-
-  .wishlist-artist {
-    max-width: 100%;
-    flex: 1 1 100%;
-    overflow: visible;
-    overflow-wrap: anywhere;
-    white-space: normal;
-
-    &::before {
-      content: none;
-    }
-  }
-
-  .wishlist-song-summary .wishlist-badge {
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  .wishlist-item-actions {
-    width: 100%;
-    align-items: flex-end;
-    flex-direction: column;
-    justify-content: flex-end;
-    gap: var(--space-1);
-  }
-
-  .wishlist-medley {
-    padding: var(--space-2);
-  }
-
-  .wishlist-medley-heading {
-    width: 100%;
-    gap: var(--space-1) var(--space-2);
-    margin-right: 0;
-  }
-
-  .wishlist-medley-heading h3 {
-    flex: 1 1 auto;
-  }
-
-  .wishlist-medley-header-actions {
-    width: 100%;
-    align-items: center;
-    justify-content: space-between;
-    margin-left: 0;
-  }
-
-  .wishlist-medley-editor {
-    padding-block: var(--space-2);
-  }
-
-  .wishlist-medley-editor-header {
-    grid-template-columns: minmax(0, 1fr);
-    gap: var(--space-2);
-  }
-
-  .wishlist-medley-edit-row {
-    grid-template-columns: auto auto minmax(0, 1fr);
-    gap: var(--space-1);
-
-    > .wishlist-item {
-      padding: var(--space-2);
-      border: 0;
-      border-radius: 0;
-      background: transparent;
-    }
-  }
-
-  .wishlist-medley-edit-row .wishlist-medley-order-controls {
-    flex-direction: column;
-  }
-
-  .wishlist-medley-edit-row .wishlist-item-line {
+.user-icon {
+    height: 2em;
+    width: 2em;
+    border-radius: 50%;
     display: flex;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .wishlist-medley-edit-row .wishlist-item-actions {
-    width: 100%;
-    justify-content: flex-end;
-    padding-top: var(--space-1);
-    border-top: 1px solid var(--color-border);
-  }
-
-  .wishlist-medley-edit-checkbox {
-    min-width: 2.25rem;
-  }
-
-  .wishlist-medley-available-song {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .wishlist-medley-available-song .muted {
-    grid-column: 2;
-  }
-
-  .wishlist-medley-menu > .btn,
-  .wishlist-medley-header-actions .wishlist-feedback-toggle {
-    min-height: 2.5rem;
-  }
-
-  .wishlist-medley-song.is-grouped.is-manageable {
-    display: grid;
-    grid-template-columns: 2.5rem minmax(0, 1fr) 2.5rem;
+    justify-content: center;
     align-items: center;
-    column-gap: var(--space-1);
-  }
-
-  .wishlist-medley-song.is-grouped.is-manageable > .wishlist-item {
-    grid-column: 2;
-    grid-row: 1;
-    width: 100%;
-    padding: var(--space-2);
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-  }
+    font-size: 1.2em;
+}
 
-  .wishlist-medley-song.is-grouped.is-manageable .wishlist-medley-order-controls {
-    grid-column: 1;
-    grid-row: 1;
-    align-self: stretch;
-    flex-direction: column;
-    justify-content: stretch;
-    margin-left: 0;
-  }
+.user-card {
+    position: absolute;
+    right: 0;
+    background-color: var(--color-topbar);
+    margin-top: .3em;
+    padding: .5em;
+    border: 1px solid var(--color-border);
+}
 
-  .wishlist-medley-song.is-grouped:not(.is-manageable) > .wishlist-item {
-    flex-basis: 100%;
-  }
+.topbar-nav {
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
 
-  .wishlist-medley-song.is-grouped .wishlist-song-summary {
-    align-items: flex-start;
-    flex-direction: column;
-    flex-wrap: nowrap;
-    width: 100%;
-    gap: var(--space-1);
-    overflow: visible;
-  }
+  a {
+    color: var(--color-text-muted);
+    font-size: 0.92rem;
+    font-weight: 500;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    transition: color var(--transition), background var(--transition);
+    display: block;
 
-  .wishlist-medley-song.is-grouped .wishlist-song-summary h3,
-  .wishlist-medley-song.is-grouped .wishlist-artist {
-    width: 100%;
-    max-width: 100%;
-    flex: 1 1 auto;
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-song-summary h3 {
-    overflow: visible;
-    overflow-wrap: anywhere;
-    text-overflow: clip;
-    white-space: normal;
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-artist {
-    overflow: visible;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-artist::before {
-    content: none;
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-song-summary .wishlist-badge {
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-item-line {
-    display: flex;
-    align-items: stretch;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-item {
-    padding-top: var(--space-3);
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-item-line {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: var(--space-2);
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-song-summary {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .wishlist-medley-song.is-grouped .wishlist-item-actions {
-    grid-column: 2;
-    grid-row: 1;
-    width: 100%;
-    align-items: flex-end;
-    flex-direction: column;
-    justify-content: flex-start;
-    padding-top: 0;
-    border-top: 0;
-  }
-
-  .wishlist-medley-song.is-grouped.is-manageable > .wishlist-medley-remove {
-    grid-column: 3;
-    grid-row: 1;
-    align-self: center;
-    width: 2.5rem;
-    max-width: none;
-    padding: 0;
-  }
-
-  .wishlist-medley-order-controls .btn,
-  .wishlist-medley-remove {
-    min-width: 2.5rem;
-    min-height: 2rem;
-  }
-
-  .wishlist-medley-order-controls .btn {
-    width: 2.5rem;
-    flex: 1 1 50%;
-    min-height: 2.5rem;
-    padding: 0;
-  }
-
-  .wishlist-feedback-content {
-    position: fixed;
-    top: 50%;
-    right: auto;
-    left: 50%;
-    width: calc(100vw - 2rem);
-    max-width: 28rem;
-    max-height: calc(100vh - 2rem);
-    max-height: calc(100dvh - 2rem);
-    padding: var(--space-3);
-    overflow-y: auto;
-    transform: translate(-50%, -50%);
-  }
-
-  .wishlist-feedback-form {
-    align-items: stretch;
-    flex-direction: column;
-
-    .btn {
-      align-self: flex-end;
-    }
-  }
-
-  .wishlist-edit-form {
-    width: calc(100vw - 1.5rem);
-    max-height: calc(100vh - 1.5rem);
-    max-height: calc(100dvh - 1.5rem);
-    grid-template-columns: minmax(0, 1fr);
-    padding: var(--space-3);
-
-    .wishlist-edit-actions,
-    [data-testid="wishlist-edit-error"] {
-      grid-column: auto;
-    }
-  }
-
-  .wishlist-edit-actions {
-    flex-wrap: wrap;
-
-    > :first-child {
-      margin-left: 0;
+    &:hover,
+    &[aria-current="page"] {
+      color: var(--color-text);
+      background: var(--color-accent-soft);
     }
   }
 }
 
-@media (min-width: 1024px) {
-  .app-main {
-    padding-top: var(--space-8);
-  }
+.topbar-nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+@media screen and (max-width: 700px) {
+    .topbar-nav.mobile-open {
+        display: flex;
+        position: absolute;
+        left: 1em;
+        margin-top: .5em;
+        background: var(--color-topbar);
+        border: solid 1px var(--color-border);
+    }
+}
+
+@media screen and (min-width: 700px) {
+    .topbar-nav {
+        display: flex;
+    }
+    .topbar-nav ul {
+        display: flex;
+        flex-direction: row;
+    }
 }
