@@ -86,7 +86,7 @@ fn UserIcon(member: Member) -> impl IntoView {
 
     view! {
         <div class="user-icon-container">
-        <button class="user-icon btn btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{member.name.chars().next().unwrap()}{member.name.split_whitespace().nth(2)}
+        <button class="user-icon btn btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{member.name.chars().next().unwrap()}{member.name.split_ascii_whitespace().nth(1).unwrap_or("").chars().next().unwrap_or_default()}
         </button>
         <Show when=move || menu_open.get()>
             <div class="user-card">
