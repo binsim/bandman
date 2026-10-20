@@ -29,7 +29,7 @@ pub fn AppShell(children: Children) -> impl IntoView {
                 <Suspense fallback=|| ()>
                     {move || match member.get().flatten() {
                         Some(m) => view! {
-                            <div class="topbar-nav-container">
+                            <div class="topbar-nav-container" data-testid="topbar-navigation-container">
                                 <nav class="topbar-nav" class:mobile-open=move || nav_open.get() aria-label="Main">
                                     <ul>
                                         <li><A href="/">{move || tr!("nav-program")}</A></li>
@@ -51,9 +51,11 @@ pub fn AppShell(children: Children) -> impl IntoView {
                             <UserIcon member=m/>
                         }.into_any(),
                         None => view! {
-                                            <A href="/login" attr:class="btn btn-primary btn-sm">
-                                                {move || tr!("nav-login")}
-                                            </A>
+                            <div class="user-icon-container">
+                                <A href="/login" attr:class="btn btn-primary btn-sm" attr:data-testid="login-btn">
+                                    {move || tr!("nav-login")}
+                                </A>
+                            </div>
                         }.into_any(),
                     }}
                 </Suspense>

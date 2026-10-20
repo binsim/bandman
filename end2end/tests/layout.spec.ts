@@ -1,51 +1,140 @@
-import {test, expect } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { ADMIN_FILE, MEMBER_FILE, PARTICIPANT_FILE } from "./helpers";
 
 const USER_ICON = "user-icon";
+const LOGIN_BUTTON = "login-btn";
+const TOPBAR_NAVIGATION_CONTAINER = "topbar-navigation-container";
 
 test.describe("No user logged in", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-  })
+  });
 
-  test("User icon is hidden", async ({ page }) => {
+  test("Titlebar shows correct information", async ({ page }) => {
     await expect(page.getByTestId(USER_ICON)).toBeHidden();
-  })
+    await expect(page.getByTestId(LOGIN_BUTTON)).toBeVisible();
+    await expect(page.getByTestId("brand-name")).toHaveText("Bandman");
+    await expect(page.getByTestId(TOPBAR_NAVIGATION_CONTAINER)).toBeHidden();
+  });
 });
 
 test.describe("Admin user logged in", () => {
-  test.use({storageState: ADMIN_FILE})
+  test.use({ storageState: ADMIN_FILE });
   test.beforeEach(async ({ page }) => {
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-  })
+  });
 
-  test("User icon exists", async ({ page }) => {
+  test("Titlebar shows correct information", async ({ page }) => {
     await expect(page.getByTestId(USER_ICON)).toBeVisible();
-  })
+    await expect(page.getByTestId(LOGIN_BUTTON)).toBeHidden();
+    await expect(page.getByTestId("brand-name")).toHaveText("Bandman");
+  });
+
+  test("Navigation is accessible", async ({ page }) => {
+    expect(
+      await page
+        .getByTestId(TOPBAR_NAVIGATION_CONTAINER)
+        .locator("ul > li")
+        .allInnerTexts(),
+    ).toStrictEqual(["Program", "Wishlist", "Plan", "Finance", "Admin"]);
+
+    const viewport = page.viewportSize();
+    if (viewport!.width < 700) {
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeHidden();
+      await page.getByTestId("brand-name").click();
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeVisible();
+
+      // TODO: add checks for formatting
+    } else {
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeVisible();
+    }
+  });
 });
 
 test.describe("Participant user logged in", () => {
-  test.use({storageState: PARTICIPANT_FILE})
+  test.use({ storageState: PARTICIPANT_FILE });
   test.beforeEach(async ({ page }) => {
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-  })
+  });
 
-  test("User icon exists", async ({ page }) => {
+  test("Titlebar shows correct information", async ({ page }) => {
     await expect(page.getByTestId(USER_ICON)).toBeVisible();
-  })
+    await expect(page.getByTestId(LOGIN_BUTTON)).toBeHidden();
+    await expect(page.getByTestId("brand-name")).toHaveText("Bandman");
+  });
+
+  test("Navigation is accessible", async ({ page }) => {
+    expect(
+      await page
+        .getByTestId(TOPBAR_NAVIGATION_CONTAINER)
+        .locator("ul > li")
+        .allInnerTexts(),
+    ).toStrictEqual(["Program", "Wishlist", "Plan", "Finance"]);
+
+    const viewport = page.viewportSize();
+    if (viewport!.width < 700) {
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeHidden();
+      await page.getByTestId("brand-name").click();
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeVisible();
+
+      // TODO: add checks for formatting
+    } else {
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeVisible();
+    }
+  });
 });
 
 test.describe("Member user logged in", () => {
-  test.use({storageState: MEMBER_FILE})
+  test.use({ storageState: MEMBER_FILE });
   test.beforeEach(async ({ page }) => {
     await page.goto("/", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-  })
+  });
 
-  test("User icon exists", async ({ page }) => {
+  test("Titlebar shows correct information", async ({ page }) => {
     await expect(page.getByTestId(USER_ICON)).toBeVisible();
-  })
+    await expect(page.getByTestId(LOGIN_BUTTON)).toBeHidden();
+    await expect(page.getByTestId("brand-name")).toHaveText("Bandman");
+  });
+
+  test("Navigation is accessible", async ({ page }) => {
+    expect(
+      await page
+        .getByTestId(TOPBAR_NAVIGATION_CONTAINER)
+        .locator("ul > li")
+        .allInnerTexts(),
+    ).toStrictEqual(["Program", "Wishlist", "Plan"]);
+
+    const viewport = page.viewportSize();
+    if (viewport!.width < 700) {
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeHidden();
+      await page.getByTestId("brand-name").click();
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeVisible();
+
+      // TODO: add checks for formatting
+    } else {
+      expect(
+        page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
+      ).toBeVisible();
+    }
+  });
 });

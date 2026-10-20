@@ -1,5 +1,10 @@
 import { expect, Locator, Page, test } from "@playwright/test";
-import { ADMIN_FILE,  isArraySorted,  MEMBER_FILE, PARTICIPANT_FILE } from "./helpers";
+import {
+  ADMIN_FILE,
+  isArraySorted,
+  MEMBER_FILE,
+  PARTICIPANT_FILE,
+} from "./helpers";
 import { randomUUID } from "node:crypto";
 
 const ADD_MEMBER_NAME_INPUT = "admin-member-name";
@@ -22,35 +27,35 @@ test.describe("No user logged in", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/admin", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-  })
+  });
 
-    test("page should not be accessible", async ({ page }) => {
-      await expect(page.getByTestId("admin-access-denied")).toBeVisible();
-    })
+  test("page should not be accessible", async ({ page }) => {
+    await expect(page.getByTestId("admin-access-denied")).toBeVisible();
+  });
 });
 
 test.describe("Member user logged in", () => {
-  test.use({storageState: MEMBER_FILE})
+  test.use({ storageState: MEMBER_FILE });
   test.beforeEach(async ({ page }) => {
     await page.goto("/admin", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-  })
+  });
 
   test("page should not be accessible", async ({ page }) => {
     await expect(page.getByTestId("admin-access-denied")).toBeVisible();
-  })
+  });
 });
 
 test.describe("Participant user logged in", () => {
-  test.use({storageState: PARTICIPANT_FILE})
+  test.use({ storageState: PARTICIPANT_FILE });
   test.beforeEach(async ({ page }) => {
     await page.goto("/admin", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-  })
+  });
 
   test("page should not be accessible", async ({ page }) => {
     await expect(page.getByTestId("admin-access-denied")).toBeVisible();
-  })
+  });
 });
 
 test.describe("Admin user logged in", () => {
@@ -78,7 +83,7 @@ test.describe("Admin user logged in", () => {
     );
   }
 
-  test.use({storageState: ADMIN_FILE})
+  test.use({ storageState: ADMIN_FILE });
   test.beforeEach(async ({ page }) => {
     await page.goto("/admin", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
