@@ -86,7 +86,7 @@ fn UserIcon(member: Member) -> impl IntoView {
 
     view! {
         <div class="user-icon-container">
-        <button class="user-icon btn btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{member.name.chars().next().unwrap()}{member.name.split_ascii_whitespace().nth(1).unwrap_or("").chars().next().unwrap_or_default()}
+        <button class="user-icon btn btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{get_user_icon_content(&member.name)}
         </button>
         <Show when=move || menu_open.get()>
             <div class="user-card">
@@ -113,4 +113,35 @@ fn UserIcon(member: Member) -> impl IntoView {
             </Show>
         </div>
     }.into_any()
+}
+
+fn get_user_icon_content(member_name: &str) -> String {
+    let mut split = member_name.split_whitespace();
+    let mut result_string;
+    if let Some(first_word) = split.next() && let Some(first_char) = first_word.chars().next()  {
+            result_string = String::from(first_char);
+    }
+    else {
+        return "".to_string()
+    }
+
+    if let Some(second) = split.next() && let Some(first_char) = second.chars().next() {
+        result_string.push(first_char);
+    }
+    result_string
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_without_spaces_has_one_digit() {
+        assert_eq!(get_user_icon_content("Admin"), "A");
+    }
+
+    #[test]
+    fn user_with_space_has_two_digits() {
+        assert_eq!(get_user_icon_content("Admin Admin"), "AA");
+    }
 }
