@@ -370,12 +370,11 @@ fn WishlistLoaded(
     {
         let load_filter_storage_key = filter_storage_key.clone();
         Effect::new(move |_| {
-            if let Some(window) = web_sys::window() {
-                if let Ok(Some(storage)) = window.local_storage() {
-                    if let Ok(Some(value)) = storage.get_item(&load_filter_storage_key) {
-                        show_needs_feedback.set(value != "false");
-                    }
-                }
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+                && let Ok(Some(value)) = storage.get_item(&load_filter_storage_key)
+            {
+                show_needs_feedback.set(value != "false");
             }
         });
     }
@@ -383,11 +382,10 @@ fn WishlistLoaded(
         show_needs_feedback.set(show);
         #[cfg(feature = "hydrate")]
         {
-            if let Some(window) = web_sys::window() {
-                if let Ok(Some(storage)) = window.local_storage() {
-                    let _ =
-                        storage.set_item(&filter_storage_key, if show { "true" } else { "false" });
-                }
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+            {
+                let _ = storage.set_item(&filter_storage_key, if show { "true" } else { "false" });
             }
         }
     });
