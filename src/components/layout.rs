@@ -120,14 +120,17 @@ fn UserIcon(member: Member) -> impl IntoView {
 fn get_user_icon_content(member_name: &str) -> String {
     let mut split = member_name.split_whitespace();
     let mut result_string;
-    if let Some(first_word) = split.next() && let Some(first_char) = first_word.chars().next()  {
-            result_string = String::from(first_char);
-    }
-    else {
-        return "".to_string()
+    if let Some(first_word) = split.next()
+        && let Some(first_char) = first_word.chars().next()
+    {
+        result_string = String::from(first_char);
+    } else {
+        return "".to_string();
     }
 
-    if let Some(second) = split.next() && let Some(first_char) = second.chars().next() {
+    if let Some(second) = split.next()
+        && let Some(first_char) = second.chars().next()
+    {
         result_string.push(first_char);
     }
     result_string

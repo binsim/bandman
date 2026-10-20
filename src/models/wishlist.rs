@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
-use sqlx::{postgres::PgRow, FromRow, PgPool, Row};
+use sqlx::{FromRow, PgPool, Row, postgres::PgRow};
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -1294,11 +1294,13 @@ mod tests {
         assert_eq!(item.musical_key.as_deref(), Some("G major"));
         assert_eq!(item.targets, ["party", "slow-dance"]);
         assert_eq!(item.category, WishlistCategory::Medley);
-        assert!(WishlistItem::list(&pool)
-            .await
-            .expect("wishlist should be listed")
-            .iter()
-            .any(|listed| listed.id == item.id));
+        assert!(
+            WishlistItem::list(&pool)
+                .await
+                .expect("wishlist should be listed")
+                .iter()
+                .any(|listed| listed.id == item.id)
+        );
         let listed = WishlistItem::list(&pool)
             .await
             .expect("wishlist should be listed")
@@ -1581,11 +1583,13 @@ mod tests {
         WishlistItem::set_medley_feedback(&pool, medley_id, member.id, None)
             .await
             .expect("medley feedback should be removed");
-        assert!(!WishlistItem::list_medley_feedback(&pool)
-            .await
-            .expect("medley feedback should still be listable")
-            .iter()
-            .any(|feedback| feedback.medley_id == medley_id));
+        assert!(
+            !WishlistItem::list_medley_feedback(&pool)
+                .await
+                .expect("medley feedback should still be listable")
+                .iter()
+                .any(|feedback| feedback.medley_id == medley_id)
+        );
         WishlistItem::set_medley_feedback(
             &pool,
             medley_id,
@@ -1597,11 +1601,13 @@ mod tests {
         WishlistItem::disband_medley(&pool, medley_id, member.id, false)
             .await
             .expect("creator should disband the medley");
-        assert!(!WishlistItem::list_medley_feedback(&pool)
-            .await
-            .expect("medley feedback should be listed after disbanding")
-            .iter()
-            .any(|feedback| feedback.medley_id == medley_id));
+        assert!(
+            !WishlistItem::list_medley_feedback(&pool)
+                .await
+                .expect("medley feedback should be listed after disbanding")
+                .iter()
+                .any(|feedback| feedback.medley_id == medley_id)
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -1637,14 +1643,18 @@ mod tests {
             WishlistItem::delete(&pool, item.id, admin.id, false).await,
             Err(WishlistError::DeleteForbidden)
         ));
-        assert!(WishlistItem::delete(&pool, item.id, proposer.id, false)
-            .await
-            .is_ok());
-        assert!(WishlistItem::list(&pool)
-            .await
-            .expect("wishlist should be listed")
-            .iter()
-            .all(|listed| listed.id != item.id));
+        assert!(
+            WishlistItem::delete(&pool, item.id, proposer.id, false)
+                .await
+                .is_ok()
+        );
+        assert!(
+            WishlistItem::list(&pool)
+                .await
+                .expect("wishlist should be listed")
+                .iter()
+                .all(|listed| listed.id != item.id)
+        );
         let feedback_count: i64 = sqlx::query_scalar(
             "SELECT COUNT(*) FROM wishlist_feedback WHERE wishlist_item_id = $1",
         )
@@ -1863,12 +1873,14 @@ mod tests {
         WishlistItem::disband_medley(&pool, medley_id, member.id, false)
             .await
             .expect("creator should be able to disband their medley");
-        assert!(WishlistItem::list(&pool)
-            .await
-            .expect("wishlist should be listed")
-            .iter()
-            .filter(|item| song_ids.contains(&item.id))
-            .all(|item| item.medley_id.is_none()));
+        assert!(
+            WishlistItem::list(&pool)
+                .await
+                .expect("wishlist should be listed")
+                .iter()
+                .filter(|item| song_ids.contains(&item.id))
+                .all(|item| item.medley_id.is_none())
+        );
 
         let medley_id = WishlistItem::create_medley(&pool, &selected_ids, "Test medley", member.id)
             .await
@@ -2026,9 +2038,11 @@ mod tests {
             .filter(|item| item.medley_id == Some(medley_id))
             .collect();
         assert_eq!(grouped.len(), 3);
-        assert!(grouped
-            .iter()
-            .all(|item| item.medley_name.as_deref() == Some("Opening set")));
+        assert!(
+            grouped
+                .iter()
+                .all(|item| item.medley_name.as_deref() == Some("Opening set"))
+        );
         assert_eq!(
             grouped.iter().map(|item| item.id).collect::<Vec<_>>(),
             vec![song_ids[0], song_ids[2], song_ids[1]]
@@ -2135,9 +2149,11 @@ mod tests {
             grouped.iter().map(|item| item.id).collect::<Vec<_>>(),
             vec![song_ids[2], song_ids[0], song_ids[3]]
         );
-        assert!(grouped
-            .iter()
-            .all(|item| item.medley_name.as_deref() == Some("After edit")));
+        assert!(
+            grouped
+                .iter()
+                .all(|item| item.medley_name.as_deref() == Some("After edit"))
+        );
         let removed_song = listed
             .iter()
             .find(|item| item.id == song_ids[1])

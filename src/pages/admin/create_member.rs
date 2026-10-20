@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 use leptos::{
+    IntoView,
     callback::{Callable, Callback},
     component,
     reactive::{
@@ -8,7 +9,7 @@ use leptos::{
     },
     server,
     server_fn::ServerFnError,
-    view, IntoView,
+    view,
 };
 use leptos_fluent::tr;
 
