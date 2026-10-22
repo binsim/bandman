@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { ADMIN_FILE, MEMBER_FILE, PARTICIPANT_FILE } from "./helpers";
+import { exportBuffer } from "node:ffi";
 
 const USER_ICON = "user-icon";
 const LOGIN_BUTTON = "login-btn";

@@ -2,6 +2,9 @@ import { test, expect } from "@playwright/test";
 import { ADMIN_FILE, MEMBER_FILE, PARTICIPANT_FILE } from "./helpers";
 
 const USER_ICON = "user-icon";
+const USER_CARD = "user-card";
+const LANG_SWITCHER = "lang-switcher";
+const THEME_TOGGLE = "theme-toggle";
 const LOGIN_BUTTON = "login-btn";
 const TOPBAR_NAVIGATION_CONTAINER = "topbar-navigation-container";
 
@@ -57,6 +60,16 @@ test.describe("Admin user logged in", () => {
       ).toBeVisible();
     }
   });
+
+  test("Clicking user icon opens user card", async ({ page }) => {
+    await page.getByTestId(USER_ICON).click();
+
+    await expect(page.getByTestId(USER_CARD)).toBeVisible();
+    await expect(page.getByTestId(LANG_SWITCHER)).toBeVisible();
+    await expect(page.getByTestId(THEME_TOGGLE)).toBeVisible();
+
+    await expect(page.getByTestId(LOGIN_BUTTON)).toBeVisible();
+  });
 });
 
 test.describe("Participant user logged in", () => {
@@ -97,6 +110,16 @@ test.describe("Participant user logged in", () => {
       ).toBeVisible();
     }
   });
+
+  test("Clicking user icon opens user card", async ({ page }) => {
+    await page.getByTestId(USER_ICON).click();
+
+    await expect(page.getByTestId(USER_CARD)).toBeVisible();
+    await expect(page.getByTestId(LANG_SWITCHER)).toBeVisible();
+    await expect(page.getByTestId(THEME_TOGGLE)).toBeVisible();
+
+    await expect(page.getByTestId(LOGIN_BUTTON)).toBeVisible();
+  });
 });
 
 test.describe("Member user logged in", () => {
@@ -136,5 +159,15 @@ test.describe("Member user logged in", () => {
         page.getByTestId(TOPBAR_NAVIGATION_CONTAINER).locator("ul"),
       ).toBeVisible();
     }
+  });
+
+  test("Clicking user icon opens user card", async ({ page }) => {
+    await page.getByTestId(USER_ICON).click();
+
+    await expect(page.getByTestId(USER_CARD)).toBeVisible();
+    await expect(page.getByTestId(LANG_SWITCHER)).toBeVisible();
+    await expect(page.getByTestId(THEME_TOGGLE)).toBeVisible();
+
+    await expect(page.getByTestId(LOGIN_BUTTON)).toBeVisible();
   });
 });

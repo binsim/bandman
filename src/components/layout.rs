@@ -91,7 +91,7 @@ fn UserIcon(member: Member) -> impl IntoView {
         <button class="user-icon btn btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{get_user_icon_content(&member.name)}
         </button>
         <Show when=move || menu_open.get()>
-            <div class="user-card">
+            <div class="user-card" data-testid="user-card">
             // <section> Logged in as<br/> {member_name}</section>
             <hr/>
             <section>
