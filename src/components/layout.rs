@@ -5,6 +5,7 @@ use crate::models::{Member, MemberRole};
 use leptos::prelude::*;
 use leptos_fluent::tr;
 use leptos_router::components::A;
+use leptos_router::hooks::use_location;
 
 #[component]
 pub fn AppShell(children: Children) -> impl IntoView {
@@ -50,13 +51,7 @@ pub fn AppShell(children: Children) -> impl IntoView {
                             </div>
                             <UserIcon member=m/>
                         }.into_any(),
-                        None => view! {
-                            <div class="user-icon-container">
-                                <A href="/login" attr:class="btn btn-primary btn-sm" attr:data-testid="login-btn">
-                                    {move || tr!("nav-login")}
-                                </A>
-                            </div>
-                        }.into_any(),
+                        None => view! { <LoginButton /> }.into_any()
                     }}
                 </Suspense>
             </header>
@@ -66,6 +61,21 @@ pub fn AppShell(children: Children) -> impl IntoView {
         </div>
     }
 }
+#[component]
+fn LoginButton() -> impl IntoView {
+    if use_location().pathname.get() == "/login" {
+        return ().into_any();
+    }
+
+    view! {
+        <div class="user-icon-container">
+            <A href="/login" attr:class="btn btn-primary btn-sm" attr:data-testid="login-btn">
+                {move || tr!("nav-login")}
+            </A>
+        </div>
+    }.into_any()
+}
+
 #[component]
 fn UserIcon(member: Member) -> impl IntoView {
     let (menu_open, set_menu_open) = signal(false);

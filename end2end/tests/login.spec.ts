@@ -14,8 +14,6 @@ test.describe("No user logged in", () => {
 
   test("Titlebar shows reduced information", async ({ page }) => {
     await expect(page.getByTestId(USER_ICON)).toBeHidden();
-    // TODO:
-    // await expect(page.getByTestId(LOGIN_BUTTON)).toBeHidden();
     await expect(page.getByTestId(TOPBAR_NAVIGATION_CONTAINER)).toBeHidden();
   });
 
