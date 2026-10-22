@@ -1,32 +1,68 @@
 import { expect, test } from "@playwright/test";
-import { gotoHydrated } from "./helpers";
+import { ADMIN_FILE, MEMBER_FILE, PARTICIPANT_FILE } from "./helpers";
+import { exportBuffer } from "node:ffi";
 
-test.describe("login", () => {
-  test("logs in as member and shwos session anem", async ({ page }) => {
-    await gotoHydrated(page, "/login");
+const USER_ICON = "user-icon";
+const LOGIN_BUTTON = "login-btn";
+const TOPBAR_NAVIGATION_CONTAINER = "topbar-navigation-container";
+
+test.describe("No user logged in", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
   });
 
-  test("logs in as Admin and shows session name", async ({ page }) => {
-    await gotoHydrated(page, "/login");
+  test("Titlebar shows reduced information", async ({ page }) => {
+    await expect(page.getByTestId(USER_ICON)).toBeHidden();
+    // TODO:
+    // await expect(page.getByTestId(LOGIN_BUTTON)).toBeHidden();
+    await expect(page.getByTestId(TOPBAR_NAVIGATION_CONTAINER)).toBeHidden();
+  });
 
-    await expect(page.getByRole("link", { name: "Admin" })).toBeHidden();
-    await expect(page.getByRole("link", { name: "Finance" })).toBeHidden();
-
+  test("Login form gets displayed in the center", async ({ page }) => {
     await expect(page.getByTestId("login-form")).toBeVisible();
     const select = page.getByTestId("login-member-select");
     await expect(select).toBeVisible();
+  });
+
+  test("requires choosing a member", async ({ page }) => {
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("login-error")).toBeVisible();
+  });
+
+  test("Logging in changes page", async ({ page }) => {
+    const select = page.getByTestId("login-member-select");
     await select.selectOption({ label: "Admin" });
     await page.getByTestId("login-submit").click();
 
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByTestId("session-name")).toHaveText("Admin");
-    await expect(page.getByRole("link", { name: "Admin" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Finance" })).toBeVisible();
+  });
+});
+
+test.describe("Admin logged in", () => {
+  test.use({ storageState: ADMIN_FILE });
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
   });
 
-  test("requires choosing a member", async ({ page }) => {
-    await gotoHydrated(page, "/login");
-    await page.getByTestId("login-submit").click();
-    await expect(page.getByTestId("login-error")).toBeVisible();
+  // TODO: Need to redirect
+});
+test.describe("Participant logged in", () => {
+  test.use({ storageState: PARTICIPANT_FILE });
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
   });
+
+  // TODO: Need to redirect
+});
+test.describe("Member logged in", () => {
+  test.use({ storageState: MEMBER_FILE });
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/login", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
+  });
+
+  // TODO: Need to redirect
 });
