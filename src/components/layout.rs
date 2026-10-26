@@ -77,7 +77,8 @@ fn LoginButton() -> impl IntoView {
                 {move || tr!("nav-login")}
             </A>
         </div>
-    }.into_any()
+    }
+    .into_any()
 }
 
 #[component]
