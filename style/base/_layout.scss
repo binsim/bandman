@@ -1,0 +1,121 @@
+@use "../shared/tokens";
+
+body > header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--topbar-height);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-topbar);
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: blur(12px);
+
+
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-weight: 700;
+  white-space: nowrap;
+
+  &:hover {
+    color: var(--color-text);
+  }
+
+  > .mark {
+    display: grid;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-sm);
+    background: var(--color-accent);
+    color: #fff;
+    font-size: 0.95rem;
+  }
+
+  > .name {
+    font-size: 1.05rem;
+  }
+}
+
+.user-icon-container {
+    position: relative;
+    margin-left: auto;
+}
+
+.user-icon {
+    height: 2.4em;
+    width: 2.4em;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 1px solid var(--color-border);
+    font-size: 1.2em;
+}
+
+.user-card {
+    position: absolute;
+    right: 0;
+    background-color: var(--color-topbar);
+    margin-top: .3em;
+    padding: .5em;
+    border: 1px solid var(--color-border);
+}
+
+body > header nav{
+  display: none;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1;
+
+  a {
+    color: var(--color-text-muted);
+    font-size: 0.92rem;
+    font-weight: 500;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    transition: color var(--transition), background var(--transition);
+    display: block;
+
+    &:hover,
+    &[aria-current="page"] {
+      color: var(--color-text);
+      background: var(--color-accent-soft);
+    }
+  }
+}
+
+body > header nav ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+@media screen and (max-width: 700px) {
+    body > header nav.mobile-open {
+        display: flex;
+        position: absolute;
+        left: 1em;
+        margin-top: .5em;
+        background: var(--color-topbar);
+        border: solid 1px var(--color-border);
+    }
+}
+
+@media screen and (min-width: 700px) {
+    body > header nav {
+        display: flex;
+    }
+    body > header nav ul {
+        display: flex;
+        flex-direction: row;
+    }
+}

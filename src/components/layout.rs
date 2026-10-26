@@ -21,43 +21,47 @@ pub fn AppShell(children: Children) -> impl IntoView {
     provide_context(member);
 
     view! {
-        <div class="app-shell">
-            <header class="topbar" data-testid="topbar">
+            <header data-testid="topbar">
                 <div class="brand" style="border: none" on:click=move |_| set_nav_open.update(|open| *open = !*open)>
-                    <span class="brand-mark">"♪"</span>
-                    <span class="brand-name" data-testid="brand-name">"Bandman"</span>
+                    <span class="mark">"♪"</span>
+                    <span class="name" data-testid="brand-name">"Bandman"</span>
                 </div>
                 <Suspense fallback=|| ()>
                     {move || match member.get().flatten() {
                         Some(m) => view! {
-                            <div class="topbar-nav-container" data-testid="topbar-navigation-container">
-                                <nav class="topbar-nav" class:mobile-open=move || nav_open.get() aria-label="Main">
-                                    <ul>
-                                        <li><A href="/">{move || tr!("nav-program")}</A></li>
-                                        <li><A href="/wishlist">{move || tr!("nav-wishlist")}</A></li>
-                                        <li><A href="/plan">{move || tr!("nav-plan")}</A></li>
-                                        {if m.role == MemberRole::Participant || m.role == MemberRole::Admin {
-                                            view! { <li><A href="/finance">{move || tr!("nav-finance")}</A></li> }.into_any()
-                                        } else {
-                                            ().into_any()
-                                        }}
-                                        {if m.role == MemberRole::Admin {
-                                            view! { <li><A href="/admin">{move || tr!("nav-admin")}</A></li> }.into_any()
-                                        } else {
-                                            ().into_any()
-                                        }}
-                                    </ul>
-                                </nav>
-                            </div>
+                            <Navigation role=m.role navigation_open=nav_open.get() />
                             <UserIcon member=m/>
                         }.into_any(),
                         None => view! { <LoginButton /> }.into_any()
                     }}
                 </Suspense>
             </header>
-            <main class="app-main">
+            <main>
                 {children()}
             </main>
+    }
+}
+#[component]
+fn Navigation(role: MemberRole, navigation_open: bool) -> impl IntoView {
+    view! {
+        <div class="topbar-nav-container" data-testid="topbar-navigation-container">
+            <nav class:mobile-open=move || navigation_open aria-label="Main">
+                <ul>
+                    <li><A href="/">{move || tr!("nav-program")}</A></li>
+                    <li><A href="/wishlist">{move || tr!("nav-wishlist")}</A></li>
+                    <li><A href="/plan">{move || tr!("nav-plan")}</A></li>
+                    {if role == MemberRole::Participant || role == MemberRole::Admin {
+                        view! { <li><A href="/finance">{move || tr!("nav-finance")}</A></li> }.into_any()
+                    } else {
+                        ().into_any()
+                    }}
+                    {if role == MemberRole::Admin {
+                        view! { <li><A href="/admin">{move || tr!("nav-admin")}</A></li> }.into_any()
+                    } else {
+                        ().into_any()
+                    }}
+                </ul>
+            </nav>
         </div>
     }
 }
@@ -98,7 +102,7 @@ fn UserIcon(member: Member) -> impl IntoView {
 
     view! {
         <div class="user-icon-container">
-        <button class="user-icon btn btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{get_user_icon_content(&member.name)}
+        <button class="user-icon btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{get_user_icon_content(&member.name)}
         </button>
         <Show when=move || menu_open.get()>
             <div class="user-card" data-testid="user-card">
