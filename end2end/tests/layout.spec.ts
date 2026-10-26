@@ -6,6 +6,7 @@ const USER_CARD = "user-card";
 const LANG_SWITCHER = "lang-switcher";
 const THEME_TOGGLE = "theme-toggle";
 const LOGIN_BUTTON = "login-btn";
+const LOGOUT_BUTTON = "logout-button";
 const TOPBAR_NAVIGATION_CONTAINER = "topbar-navigation-container";
 
 test.describe("No user logged in", () => {
@@ -68,7 +69,7 @@ test.describe("Admin user logged in", () => {
     await expect(page.getByTestId(LANG_SWITCHER)).toBeVisible();
     await expect(page.getByTestId(THEME_TOGGLE)).toBeVisible();
 
-    await expect(page.getByTestId(LOGIN_BUTTON)).toBeVisible();
+    await expect(page.getByTestId(LOGOUT_BUTTON)).toBeVisible();
   });
 });
 
@@ -118,7 +119,7 @@ test.describe("Participant user logged in", () => {
     await expect(page.getByTestId(LANG_SWITCHER)).toBeVisible();
     await expect(page.getByTestId(THEME_TOGGLE)).toBeVisible();
 
-    await expect(page.getByTestId(LOGIN_BUTTON)).toBeVisible();
+    await expect(page.getByTestId(LOGOUT_BUTTON)).toBeVisible();
   });
 });
 
@@ -168,6 +169,6 @@ test.describe("Member user logged in", () => {
     await expect(page.getByTestId(LANG_SWITCHER)).toBeVisible();
     await expect(page.getByTestId(THEME_TOGGLE)).toBeVisible();
 
-    await expect(page.getByTestId(LOGIN_BUTTON)).toBeVisible();
+    await expect(page.getByTestId(LOGOUT_BUTTON)).toBeVisible();
   });
 });
