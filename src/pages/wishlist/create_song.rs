@@ -1,5 +1,7 @@
 use super::WISHLIST_MUSICAL_KEYS;
-use crate::models::{Member, MemberRole, WishlistCategory, WishlistItem, WishlistSongDetails};
+use crate::models::{Member, MemberRole, WishlistItem};
+#[cfg(feature = "ssr")]
+use crate::models::{WishlistCategory, WishlistSongDetails};
 use leptos::prelude::*;
 use leptos_fluent::tr;
 
@@ -555,6 +557,12 @@ fn has_matching_title(
 }
 
 #[cfg(feature = "ssr")]
+#[derive(serde::Deserialize)]
+struct YoutubeOembed {
+    title: String,
+}
+
+#[cfg(feature = "ssr")]
 async fn resolve_link_title(link: &str) -> Option<String> {
     let url = reqwest::Url::parse(link).ok()?;
     if !matches!(
@@ -585,8 +593,6 @@ async fn resolve_link_title(link: &str) -> Option<String> {
 
     match response {
         Ok(response) if response.status().is_success() => {
-            use crate::pages::wishlist::YoutubeOembed;
-
             match response.json::<YoutubeOembed>().await {
                 Ok(metadata) if !metadata.title.trim().is_empty() => {
                     Some(metadata.title.trim().chars().take(200).collect())

@@ -119,11 +119,6 @@ async fn wishlist_disband_medley(medley_id: uuid::Uuid) -> Result<(), ServerFnEr
     .map_err(|error| ServerFnError::new(error.to_string()))
 }
 
-#[derive(serde::Deserialize)]
-struct YoutubeOembed {
-    title: String,
-}
-
 #[component]
 pub fn WishlistPage() -> impl IntoView {
     let member = expect_context::<Resource<Option<crate::models::Member>>>();
