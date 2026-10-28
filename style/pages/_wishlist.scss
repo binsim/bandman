@@ -8,15 +8,15 @@
 
 .wishlist-header {
   padding-block: var(--space-2);
-}
 
-.wishlist-header h1 {
-  margin-bottom: var(--space-2);
-  font-size: clamp(1.75rem, 4vw, 2.15rem);
-}
+  h1 {
+      margin-bottom: var(--space-2);
+      font-size: clamp(1.75rem, 4vw, 2.15rem);
+  }
 
-.wishlist-header .lead {
-  margin-bottom: 0;
+  .lead {
+      margin-bottom: 0;
+  }
 }
 
 .wishlist-form-card,
@@ -868,12 +868,6 @@
     min-height: 2.5rem;
   }
 
-  .wishlist-item-line {
-    align-items: stretch;
-    flex-direction: column;
-    gap: var(--space-2);
-  }
-
   .wishlist-item:not(.is-medley) {
     padding-top: var(--space-3);
   }
@@ -888,58 +882,6 @@
   .wishlist-item:not(.is-medley) .wishlist-song-summary {
     grid-column: 1;
     grid-row: 1;
-  }
-
-  .wishlist-item:not(.is-medley) .wishlist-item-actions {
-    position: static;
-    align-items: flex-end;
-    flex-direction: column;
-    grid-column: 2;
-    grid-row: 1;
-    width: 100%;
-  }
-
-  .wishlist-song-summary {
-    width: 100%;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: var(--space-1) var(--space-2);
-  }
-
-  .wishlist-song-summary h3 {
-    width: 100%;
-    max-width: 100%;
-    flex: 1 1 100%;
-    overflow: visible;
-    overflow-wrap: anywhere;
-    text-overflow: clip;
-    white-space: normal;
-  }
-
-  .wishlist-artist {
-    max-width: 100%;
-    flex: 1 1 100%;
-    overflow: visible;
-    overflow-wrap: anywhere;
-    white-space: normal;
-
-    &::before {
-      content: none;
-    }
-  }
-
-  .wishlist-song-summary .wishlist-badge {
-    max-width: 100%;
-    overflow-wrap: anywhere;
-    white-space: normal;
-  }
-
-  .wishlist-item-actions {
-    width: 100%;
-    align-items: flex-end;
-    flex-direction: column;
-    justify-content: flex-end;
-    gap: var(--space-1);
   }
 
   .wishlist-medley {
