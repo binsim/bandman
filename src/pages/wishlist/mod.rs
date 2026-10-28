@@ -1,17 +1,17 @@
-mod create_song;
+mod modify_song;
 mod wishlist_feedback_form;
 
 use crate::{
     models::{
         Member, MemberRole, WISHLIST_MUSICAL_KEYS, WishlistCategory, WishlistFeedback, WishlistItem,
     },
-    pages::wishlist::create_song::EditSong,
+    pages::wishlist::modify_song::EditSong,
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
 
 use crate::pages::wishlist::wishlist_feedback_form::WishlistFeedbackControl;
-use create_song::CreateSong;
+use modify_song::CreateSong;
 
 #[server(WishlistList, "/api")]
 async fn wishlist_list() -> Result<Vec<WishlistItem>, ServerFnError> {
