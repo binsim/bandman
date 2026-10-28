@@ -216,38 +216,47 @@ pub fn EditSong(
 ) -> impl IntoView {
     let editing = RwSignal::new(false);
     let edit_pending = RwSignal::new(false);
-
-    if !editing.get() {
-        return view! {
-            <button
-                class="btn btn-ghost btn-sm wishlist-edit-button"
-                type="button"
-                data-testid="wishlist-edit"
-                on:click=move |_| {
-                    if editing.get() {
-                        editing.set(false);
-                    } else {
-                        editing.set(true);
-                    }
-                }
-                disabled=move || edit_pending.get()
-            >
-                {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
-            </button>
-        }.into_any();
-    }
-
     let confirm_delete = RwSignal::new(false);
-    if confirm_delete.get() {
-        return view! { <DeleteConfirmationForm
-        item_id=item.get().id
-        item_name = item.get().title
-        confirm_delete
-        on_deleted
-        /> }
-        .into_any();
-    }
 
+    return view! {
+        <button
+            class="btn btn-ghost btn-sm wishlist-edit-button"
+            type="button"
+            data-testid="wishlist-edit"
+            on:click=move |_| {
+                if editing.get() {
+                    editing.set(false);
+                } else {
+                    editing.set(true);
+                }
+            }
+            disabled=move || edit_pending.get()
+        >
+            {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
+        </button>
+        <Show when= move || editing.get()>
+            <EditSongForm edit_pending editing confirm_delete item current_member=current_member.clone() on_updated />
+        </Show>
+        <Show when=move || confirm_delete.get()>
+            <DeleteConfirmationForm
+                item_id=item.get().id
+                item_name = item.get().title
+                confirm_delete
+                on_deleted
+            />
+        </Show>
+    }.into_any();
+}
+
+#[component]
+pub fn EditSongForm(
+    edit_pending: RwSignal<bool>,
+    editing: RwSignal<bool>,
+    confirm_delete: RwSignal<bool>,
+    item: RwSignal<WishlistItem>,
+    current_member: Member,
+    on_updated: Callback<WishlistItem>,
+) -> impl IntoView {
     let can_delete = current_member.role == MemberRole::Admin
         || item.get().proposed_by_id == Some(current_member.id);
 
@@ -301,54 +310,55 @@ pub fn EditSong(
     });
 
     view! {
-        <button
-            class="wishlist-edit-backdrop"
-            type="button"
-            aria-label=move || tr!("wishlist-close-edit")
-            on:click=move |_| cancel_edit.run(())
-            disabled=move || edit_pending.get()
-        ></button>
-        <form
-            class="wishlist-edit-form"
-            role="dialog"
-            aria-modal="true"
-            aria-label=move || tr!("wishlist-edit")
-            on:submit=update_song
-            on:keydown=move |event: leptos::ev::KeyboardEvent| {
-                if event.key() == "Escape" && !edit_pending.get() {
-                    cancel_edit.run(());
-                }
-            }
-        >
-            <div class="wishlist-edit-actions">
-                <button class="btn btn-primary btn-sm" type="submit" data-testid="wishlist-save-edit" disabled=move || edit_pending.get()>
-                    {move || if edit_pending.get() { tr!("wishlist-edit-saving") } else { tr!("wishlist-save-edit") }}
-                </button>
-                <button class="btn btn-ghost btn-sm" type="button" data-testid="wishlist-cancel-edit" on:click=move |_| cancel_edit.run(()) disabled=move || edit_pending.get()>
-                    {move || tr!("admin-cancel")}
-                </button>
-                {if can_delete {
-                    view! {
-                        <button
-                            class="btn btn-ghost btn-danger btn-sm wishlist-delete-button"
-                            type="button"
-                            data-testid="wishlist-delete"
-                            on:click=move |_| confirm_delete.set(true)
-                            disabled=move || edit_pending.get()
-                        >
-                            {move || tr!("wishlist-delete")}
-                        </button>
+            <button
+                class="wishlist-edit-backdrop"
+                type="button"
+                aria-label=move || tr!("wishlist-close-edit")
+                on:click=move |_| cancel_edit.run(())
+                disabled=move || edit_pending.get()
+            ></button>
+            <form
+                class="wishlist-edit-form"
+                role="dialog"
+                aria-modal="true"
+                aria-label=move || tr!("wishlist-edit")
+                on:submit=update_song
+                on:keydown=move |event: leptos::ev::KeyboardEvent| {
+                    if event.key() == "Escape" && !edit_pending.get() {
+                        cancel_edit.run(());
                     }
-                    .into_any()
-                } else {
-                    ().into_any()
-                }}
-            </div>
-            <Show when=move || error.get().is_some()>
-                <p class="form-error" role="alert" data-testid="wishlist-edit-error">{move || error.get().unwrap_or_default()}</p>
-            </Show>
-        </form>
-    }.into_any()
+                }
+            >
+                <WishlistSongFields title artist link tempo musical_key/>
+                <div class="wishlist-edit-actions">
+                    <button class="btn btn-primary btn-sm" type="submit" data-testid="wishlist-save-edit" disabled=move || edit_pending.get()>
+                        {move || if edit_pending.get() { tr!("wishlist-edit-saving") } else { tr!("wishlist-save-edit") }}
+                    </button>
+                    <button class="btn btn-ghost btn-sm" type="button" data-testid="wishlist-cancel-edit" on:click=move |_| cancel_edit.run(()) disabled=move || edit_pending.get()>
+                        {move || tr!("admin-cancel")}
+                    </button>
+                    {if can_delete {
+                        view! {
+                            <button
+                                class="btn btn-ghost btn-danger btn-sm wishlist-delete-button"
+                                type="button"
+                                data-testid="wishlist-delete"
+                                on:click=move |_| confirm_delete.set(true)
+                                disabled=move || edit_pending.get()
+                            >
+                                {move || tr!("wishlist-delete")}
+                            </button>
+                        }
+                        .into_any()
+                    } else {
+                        ().into_any()
+                    }}
+                </div>
+                <Show when=move || error.get().is_some()>
+                    <p class="form-error" role="alert" data-testid="wishlist-edit-error">{move || error.get().unwrap_or_default()}</p>
+                </Show>
+            </form>
+        }.into_any()
 }
 
 #[component]
