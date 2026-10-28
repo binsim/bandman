@@ -1,67 +1,26 @@
 mod create_song;
+mod wishlist_feedback_form;
 
-#[cfg(feature = "ssr")]
-use crate::models::WishlistSongDetails;
-use crate::models::{
-    Member, WISHLIST_MUSICAL_KEYS, WishlistCategory, WishlistFeedback, WishlistItem,
-    WishlistMedleyFeedback,
+use crate::{
+    models::{
+        Member, MemberRole, WISHLIST_MUSICAL_KEYS, WishlistCategory, WishlistFeedback, WishlistItem,
+    },
+    pages::wishlist::create_song::EditSong,
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
 
+use crate::pages::wishlist::wishlist_feedback_form::WishlistFeedbackControl;
 use create_song::CreateSong;
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
-struct WishlistPageData {
-    items: Vec<WishlistItem>,
-    medley_feedback: Vec<WishlistMedleyFeedback>,
-}
-
 #[server(WishlistList, "/api")]
-async fn wishlist_list() -> Result<WishlistPageData, ServerFnError> {
+async fn wishlist_list() -> Result<Vec<WishlistItem>, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     crate::auth::session::require_member().await?;
     let items = WishlistItem::list(&pool)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))?;
-    let medley_feedback = WishlistItem::list_medley_feedback(&pool)
-        .await
-        .map_err(|error| ServerFnError::new(error.to_string()))?;
-    Ok(WishlistPageData {
-        items,
-        medley_feedback,
-    })
-}
-
-#[server(WishlistCreate, "/api")]
-async fn wishlist_create(
-    title: String,
-    artist: String,
-    link: String,
-    tempo: String,
-    musical_key: String,
-) -> Result<WishlistItem, ServerFnError> {
-    let pool = expect_context::<crate::state::AppState>().pool;
-    let member = crate::auth::session::require_member().await?;
-    let link_title = resolve_link_title(&link).await;
-    let tempo = parse_wishlist_tempo(&tempo)?;
-    WishlistItem::create_with_music_details(
-        &pool,
-        WishlistSongDetails {
-            title: &title,
-            artist: Some(&artist),
-            link: Some(&link),
-            link_title: link_title.as_deref(),
-            tempo,
-            musical_key: Some(&musical_key),
-        },
-        &[],
-        WishlistCategory::Song,
-        member.id,
-        &member.name,
-    )
-    .await
-    .map_err(|error| ServerFnError::new(error.to_string()))
+    Ok(items)
 }
 
 #[server(WishlistSetFeedback, "/api")]
@@ -74,75 +33,6 @@ async fn wishlist_set_feedback(
     WishlistItem::set_feedback(&pool, item_id, member.id, category)
         .await
         .map_err(|error| ServerFnError::new(error.to_string()))
-}
-
-#[server(WishlistSetMedleyFeedback, "/api")]
-async fn wishlist_set_medley_feedback(
-    medley_id: uuid::Uuid,
-    category: Option<WishlistCategory>,
-) -> Result<Option<WishlistMedleyFeedback>, ServerFnError> {
-    let pool = expect_context::<crate::state::AppState>().pool;
-    let member = crate::auth::session::require_member().await?;
-    WishlistItem::set_medley_feedback(&pool, medley_id, member.id, category)
-        .await
-        .map_err(|error| ServerFnError::new(error.to_string()))
-}
-
-#[server(WishlistDelete, "/api")]
-async fn wishlist_delete(item_id: uuid::Uuid) -> Result<(), ServerFnError> {
-    let pool = expect_context::<crate::state::AppState>().pool;
-    let member = crate::auth::session::require_member().await?;
-    WishlistItem::delete(
-        &pool,
-        item_id,
-        member.id,
-        member.role == crate::models::MemberRole::Admin,
-    )
-    .await
-    .map_err(|error| ServerFnError::new(error.to_string()))
-}
-
-#[server(WishlistUpdate, "/api")]
-async fn wishlist_update(
-    item_id: uuid::Uuid,
-    title: String,
-    artist: String,
-    link: String,
-    tempo: String,
-    musical_key: String,
-) -> Result<WishlistItem, ServerFnError> {
-    let pool = expect_context::<crate::state::AppState>().pool;
-    let member = crate::auth::session::require_member().await?;
-    let link_title = resolve_link_title(&link).await;
-    let tempo = parse_wishlist_tempo(&tempo)?;
-    WishlistItem::update_details_with_music(
-        &pool,
-        item_id,
-        member.id,
-        member.role == crate::models::MemberRole::Admin,
-        WishlistSongDetails {
-            title: &title,
-            artist: Some(&artist),
-            link: Some(&link),
-            link_title: link_title.as_deref(),
-            tempo,
-            musical_key: Some(&musical_key),
-        },
-    )
-    .await
-    .map_err(|error| ServerFnError::new(error.to_string()))
-}
-
-#[cfg(feature = "ssr")]
-fn parse_wishlist_tempo(value: &str) -> Result<Option<i32>, ServerFnError> {
-    let value = value.trim();
-    if value.is_empty() {
-        return Ok(None);
-    }
-    value
-        .parse::<i32>()
-        .map(Some)
-        .map_err(|_| ServerFnError::new("Tempo must be a whole number of BPM"))
 }
 
 #[server(WishlistCreateMedley, "/api")]
@@ -230,62 +120,8 @@ async fn wishlist_disband_medley(medley_id: uuid::Uuid) -> Result<(), ServerFnEr
 }
 
 #[derive(serde::Deserialize)]
-#[cfg(feature = "ssr")]
 struct YoutubeOembed {
     title: String,
-}
-
-#[cfg(feature = "ssr")]
-async fn resolve_link_title(link: &str) -> Option<String> {
-    let url = reqwest::Url::parse(link).ok()?;
-    if !matches!(
-        url.host_str(),
-        Some(
-            "youtube.com" | "www.youtube.com" | "m.youtube.com" | "music.youtube.com" | "youtu.be"
-        )
-    ) {
-        return None;
-    }
-
-    let response = match reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(3))
-        .build()
-    {
-        Ok(client) => {
-            client
-                .get("https://www.youtube.com/oembed")
-                .query(&[("url", link), ("format", "json")])
-                .send()
-                .await
-        }
-        Err(error) => {
-            tracing::warn!(%error, "Could not build YouTube metadata client");
-            return None;
-        }
-    };
-
-    match response {
-        Ok(response) if response.status().is_success() => {
-            match response.json::<YoutubeOembed>().await {
-                Ok(metadata) if !metadata.title.trim().is_empty() => {
-                    Some(metadata.title.trim().chars().take(200).collect())
-                }
-                Ok(_) => None,
-                Err(error) => {
-                    tracing::warn!(%error, "Could not decode YouTube link metadata");
-                    None
-                }
-            }
-        }
-        Ok(response) => {
-            tracing::warn!(status = %response.status(), "Could not fetch YouTube link metadata");
-            None
-        }
-        Err(error) => {
-            tracing::warn!(%error, "Could not fetch YouTube link metadata");
-            None
-        }
-    }
 }
 
 #[component]
@@ -327,12 +163,10 @@ fn WishlistContent(current_member: Member) -> impl IntoView {
             </section>
         }>
             {move || match wishlist.get() {
-                Some(Ok(data)) => view! {
+                Some(Ok(items)) => view! {
                     <WishlistLoaded
-                        initial_items=data.items
-                        initial_medley_feedback=data.medley_feedback
-                        member_id=current_member.id
-                        can_delete_all=current_member.role == crate::models::MemberRole::Admin
+                        initial_items=items
+                        current_member=current_member.clone()
                     />
                 }.into_any(),
                 Some(Err(error)) => view! {
@@ -349,14 +183,8 @@ fn WishlistContent(current_member: Member) -> impl IntoView {
 }
 
 #[component]
-fn WishlistLoaded(
-    initial_items: Vec<WishlistItem>,
-    initial_medley_feedback: Vec<WishlistMedleyFeedback>,
-    member_id: uuid::Uuid,
-    can_delete_all: bool,
-) -> AnyView {
+fn WishlistLoaded(initial_items: Vec<WishlistItem>, current_member: Member) -> AnyView {
     let items = RwSignal::new(initial_items);
-    let medley_feedback = RwSignal::new(initial_medley_feedback);
     let medley_management_active = RwSignal::new(false);
     provide_context(medley_management_active);
     let editing_medley_id = RwSignal::new(Option::<uuid::Uuid>::None);
@@ -365,7 +193,7 @@ fn WishlistLoaded(
     provide_context(editing_medley_song_ids);
     let show_needs_feedback = RwSignal::new(true);
     #[cfg(feature = "hydrate")]
-    let filter_storage_key = format!("bandman-wishlist-needs-feedback-{member_id}");
+    let filter_storage_key = format!("bandman-wishlist-needs-feedback-{0}", current_member.id);
     #[cfg(feature = "hydrate")]
     {
         let load_filter_storage_key = filter_storage_key.clone();
@@ -405,7 +233,7 @@ fn WishlistLoaded(
                     !item
                         .feedback
                         .iter()
-                        .any(|feedback| feedback.member_id == member_id)
+                        .any(|feedback| feedback.member_id == current_member.id)
                 })
                 .filter_map(|item| item.medley_id)
                 .collect();
@@ -418,7 +246,7 @@ fn WishlistLoaded(
                             !item
                                 .feedback
                                 .iter()
-                                .any(|feedback| feedback.member_id == member_id)
+                                .any(|feedback| feedback.member_id == current_member.id)
                         })
                 })
                 .collect::<Vec<_>>()
@@ -446,7 +274,7 @@ fn WishlistLoaded(
                                 item.medley_id = Some(medley_id);
                                 item.medley_position = Some(index as i32);
                                 item.medley_size = Some(selected.len() as i64);
-                                item.medley_created_by_id = Some(member_id);
+                                item.medley_created_by_id = Some(current_member.id);
                                 item.medley_name = Some(name.clone());
                             }
                         }
@@ -595,10 +423,8 @@ fn WishlistLoaded(
             <CreateSong items on_created=on_song_created />
             <WishlistListing
                 items
-                medley_feedback
                 visible_items
-                member_id
-                can_delete_all
+                current_member
                 show_needs_feedback
                 on_filter_changed
                 selecting_medley
@@ -653,10 +479,8 @@ fn group_wishlist_items(items: Vec<WishlistItem>) -> Vec<WishlistDisplayEntry> {
 #[component]
 fn WishlistListing(
     items: RwSignal<Vec<WishlistItem>>,
-    medley_feedback: RwSignal<Vec<WishlistMedleyFeedback>>,
     visible_items: Memo<Vec<WishlistItem>>,
-    member_id: uuid::Uuid,
-    can_delete_all: bool,
+    current_member: Member,
     show_needs_feedback: RwSignal<bool>,
     on_filter_changed: Callback<bool>,
     selecting_medley: RwSignal<bool>,
@@ -700,16 +524,15 @@ fn WishlistListing(
                 fallback=|| view! { <p class="wishlist-empty">{move || tr!("wishlist-empty")}</p> }
             >
                 <Show
+                    clone:current_member
                     when=move || !visible_items.get().is_empty()
                     fallback=|| view! { <p class="wishlist-empty">{move || tr!("wishlist-no-feedback-pending")}</p> }
                 >
                     <div class="wishlist-items">
                         <WishlistItemList
                             items
-                            medley_feedback
                             entries
-                            member_id
-                            can_delete_all
+                            current_member=current_member.clone()
                             selecting_medley
                             selected_songs
                             medley_pending
@@ -837,10 +660,8 @@ fn WishlistMedleyControls(
 #[component]
 fn WishlistItemList(
     items: RwSignal<Vec<WishlistItem>>,
-    medley_feedback: RwSignal<Vec<WishlistMedleyFeedback>>,
     entries: Memo<Vec<WishlistDisplayEntry>>,
-    member_id: uuid::Uuid,
-    can_delete_all: bool,
+    current_member: Member,
     selecting_medley: RwSignal<bool>,
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
@@ -854,7 +675,7 @@ fn WishlistItemList(
             items.update(|items| {
                 if let Some(item) = items.iter_mut().find(|item| item.id == item_id) {
                     item.feedback
-                        .retain(|existing| existing.member_id != member_id);
+                        .retain(|existing| existing.member_id != current_member.id);
                     if let Some(feedback) = feedback {
                         item.feedback.push(feedback);
                     }
@@ -924,9 +745,7 @@ fn WishlistItemList(
                     <WishlistListEntry
                         entry
                         items
-                        medley_feedback
-                        member_id
-                        can_delete_all
+                        current_member=current_member.clone()
                         selecting_medley
                         selected_songs
                         medley_pending
@@ -949,9 +768,7 @@ fn WishlistItemList(
 fn WishlistListEntry(
     entry: WishlistDisplayEntry,
     items: RwSignal<Vec<WishlistItem>>,
-    medley_feedback: RwSignal<Vec<WishlistMedleyFeedback>>,
-    member_id: uuid::Uuid,
-    can_delete_all: bool,
+    current_member: Member,
     selecting_medley: RwSignal<bool>,
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
@@ -967,8 +784,7 @@ fn WishlistListEntry(
         WishlistDisplayEntry::Song(item) => view! {
             <WishlistListItem
                 item=*item
-                member_id
-                can_delete_all
+                current_member
                 selecting_medley
                 selected_songs
                 medley_pending
@@ -985,9 +801,7 @@ fn WishlistListEntry(
             <WishlistMedley
                 id
                 items
-                medley_feedback
-                member_id
-                can_delete_all
+                current_member
                 selecting_medley
                 selected_songs
                 medley_pending
@@ -1008,9 +822,7 @@ fn WishlistListEntry(
 fn WishlistMedley(
     id: uuid::Uuid,
     items: RwSignal<Vec<WishlistItem>>,
-    medley_feedback: RwSignal<Vec<WishlistMedleyFeedback>>,
-    member_id: uuid::Uuid,
-    can_delete_all: bool,
+    current_member: Member,
     selecting_medley: RwSignal<bool>,
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
@@ -1022,7 +834,6 @@ fn WishlistMedley(
     on_updated: Callback<WishlistItem>,
     on_deleted: Callback<uuid::Uuid>,
 ) -> AnyView {
-    let medley_management_active = expect_context::<RwSignal<bool>>();
     let songs = Memo::new(move |_| {
         let mut songs: Vec<_> = items
             .get()
@@ -1032,6 +843,16 @@ fn WishlistMedley(
         songs.sort_by_key(|item| item.medley_position);
         songs
     });
+    let medley_creator = Memo::new(move |_| {
+        songs
+            .get()
+            .first()
+            .and_then(|item| item.medley_created_by_id)
+    });
+    let can_manage =
+        current_member.role == MemberRole::Admin || medley_creator.get() == Some(current_member.id);
+    let member_store = StoredValue::new(current_member);
+    let medley_management_active = expect_context::<RwSignal<bool>>();
     let medley_name = Memo::new(move |_| {
         songs
             .get()
@@ -1039,13 +860,6 @@ fn WishlistMedley(
             .and_then(|item| item.medley_name.clone())
             .unwrap_or_default()
     });
-    let medley_creator = Memo::new(move |_| {
-        songs
-            .get()
-            .first()
-            .and_then(|item| item.medley_created_by_id)
-    });
-    let can_manage = move || can_delete_all || medley_creator.get() == Some(member_id);
     let song_count = Memo::new(move |_| songs.get().len());
     let expanded = RwSignal::new(true);
     let editing_name = RwSignal::new(false);
@@ -1158,14 +972,17 @@ fn WishlistMedley(
                     </span>
                 </div>
                 <div class="wishlist-medley-header-actions">
-                    <Show when=move || !medley_management_active.get()>
-                        <WishlistMedleyFeedbackControl
-                            medley_id=id
-                            member_id
-                            feedbacks=medley_feedback
-                        />
-                    </Show>
-                    <Show when=move || !medley_management_active.get() && can_manage() && !selecting_medley.get()>
+                    // <Show
+                    //     clone:current_member
+                    //     when=move || !medley_management_active.get()
+                    // >
+                        // <WishlistFeedbackControl
+                        //     item_id=id
+                        //     current_member=current_member.clone()
+                        //     is_medley=true
+                        // />
+                    // </Show>
+                    <Show when=move || !medley_management_active.get() && can_manage && !selecting_medley.get()>
                         <WishlistMedleyActions
                             name=medley_name
                             pending=medley_pending
@@ -1179,7 +996,9 @@ fn WishlistMedley(
             <Show when=move || rename_error.get().is_some()>
                 <p class="form-error" role="alert">{move || rename_error.get().unwrap_or_default()}</p>
             </Show>
-            <Show when=move || editing_name.get()>
+            <Show
+                when=move || editing_name.get()
+            >
                 <section
                     class="wishlist-medley-editor"
                     aria-label=move || tr!("wishlist-medley-edit")
@@ -1236,8 +1055,7 @@ fn WishlistMedley(
                                         </div>
                                         <WishlistRow
                                             item=item.clone()
-                                            member_id
-                                            can_delete=can_delete_all || item.proposed_by_id == Some(member_id)
+                                            current_member=member_store.read_value().clone()
                                             is_medley=true
                                             on_feedback_changed
                                             on_deleted
@@ -1268,31 +1086,30 @@ fn WishlistMedley(
                     </div>
                 </section>
             </Show>
-            <Show when=move || expanded.get()>
-            <Show when=move || !editing_name.get()>
-            <div class="wishlist-medley-songs">
-                <For
-                    each=move || songs.get()
-                key=|item| (item.id, item.medley_position)
-                    children=move |item| view! {
-                        <WishlistListItem
-                            item
-                            member_id
-                            can_delete_all
-                            selecting_medley
-                            selected_songs
-                            medley_pending
-                            on_feedback_changed
-                            on_updated
-                            on_deleted
-                            on_remove_medley_item
-                            on_move_medley_item
-                            can_manage_medley=false
-                        />
-                    }
-                />
-            </div>
-            </Show>
+            <Show
+                when=move || expanded.get() && !editing_name.get()
+            >
+                <div class="wishlist-medley-songs">
+                    <For
+                        each=move || songs.get()
+                        key=|item| (item.id, item.medley_position)
+                        children=move |item| view! {
+                            <WishlistListItem
+                                item
+                                current_member=member_store.read_value().clone()
+                                selecting_medley
+                                selected_songs
+                                medley_pending
+                                on_feedback_changed
+                                on_updated
+                                on_deleted
+                                on_remove_medley_item
+                                on_move_medley_item
+                                can_manage_medley=false
+                            />
+                        }
+                    />
+                </div>
             </Show>
         </section>
     }
@@ -1391,8 +1208,7 @@ fn WishlistMedleyActions(
 #[component]
 fn WishlistListItem(
     item: WishlistItem,
-    member_id: uuid::Uuid,
-    can_delete_all: bool,
+    current_member: Member,
     selecting_medley: RwSignal<bool>,
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
     medley_pending: RwSignal<bool>,
@@ -1405,7 +1221,6 @@ fn WishlistListItem(
 ) -> AnyView {
     let editing_medley_id = expect_context::<RwSignal<Option<uuid::Uuid>>>();
     let editing_medley_song_ids = expect_context::<RwSignal<Vec<uuid::Uuid>>>();
-    let can_delete = can_delete_all || item.proposed_by_id == Some(member_id);
     let item_id = item.id;
     let medley_id = item.medley_id;
     let grouped = medley_id.is_some();
@@ -1457,8 +1272,7 @@ fn WishlistListItem(
             </Show>
             <WishlistRow
                 item
-                member_id
-                can_delete
+                current_member
                 on_feedback_changed
                 on_deleted
                 on_updated
@@ -1518,782 +1332,75 @@ fn WishlistListItem(
 #[component]
 fn WishlistRow(
     item: WishlistItem,
-    member_id: uuid::Uuid,
-    can_delete: bool,
+    current_member: Member,
     is_medley: bool,
     on_feedback_changed: Callback<(uuid::Uuid, Option<WishlistFeedback>)>,
     on_deleted: Callback<uuid::Uuid>,
     on_updated: Callback<WishlistItem>,
 ) -> AnyView {
+    let item = RwSignal::new(item);
+
     let medley_management_active = expect_context::<RwSignal<bool>>();
-    let title = RwSignal::new(item.title.clone());
-    let artist = RwSignal::new(item.artist.clone().unwrap_or_default());
-    let link = RwSignal::new(item.link.clone().unwrap_or_default());
-    let link_title = RwSignal::new(item.link_title.clone());
-    let tempo = RwSignal::new(item.tempo);
-    let musical_key = RwSignal::new(item.musical_key.clone());
-    let link_badge_label = Memo::new(move |_| {
-        let current_link = link.get();
-        if current_link.is_empty() {
-            None
-        } else {
-            Some(
-                link_title
-                    .get()
-                    .unwrap_or_else(|| link_label(&current_link)),
-            )
-        }
-    });
-    let edit_title = RwSignal::new(item.title.clone());
-    let edit_artist = RwSignal::new(item.artist.clone().unwrap_or_default());
-    let edit_link = RwSignal::new(item.link.clone().unwrap_or_default());
-    let edit_tempo = RwSignal::new(
-        item.tempo
-            .map(|tempo| tempo.to_string())
-            .unwrap_or_default(),
-    );
-    let edit_musical_key = RwSignal::new(item.musical_key.clone().unwrap_or_default());
-    let editing = RwSignal::new(false);
-    let edit_pending = RwSignal::new(false);
-    let edit_error = RwSignal::new(Option::<String>::None);
-    let feedbacks = RwSignal::new(item.feedback.clone());
-    let delete_pending = RwSignal::new(false);
-    let delete_error = RwSignal::new(Option::<String>::None);
-    let confirming_delete = RwSignal::new(false);
-    let item_id = item.id;
-    let confirm_title = RwSignal::new(item.title.clone());
-    let update_song = move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
-        edit_pending.set(true);
-        edit_error.set(None);
-        let new_title = edit_title.get();
-        let new_artist = edit_artist.get();
-        let new_link = edit_link.get();
-        let new_tempo = edit_tempo.get();
-        let new_musical_key = edit_musical_key.get();
-        leptos::task::spawn_local(async move {
-            match wishlist_update(
-                item_id,
-                new_title,
-                new_artist,
-                new_link,
-                new_tempo,
-                new_musical_key,
-            )
-            .await
-            {
-                Ok(updated) => {
-                    title.set(updated.title.clone());
-                    artist.set(updated.artist.clone().unwrap_or_default());
-                    link.set(updated.link.clone().unwrap_or_default());
-                    link_title.set(updated.link_title.clone());
-                    tempo.set(updated.tempo);
-                    musical_key.set(updated.musical_key.clone());
-                    confirm_title.set(updated.title.clone());
-                    on_updated.run(updated);
-                    editing.set(false);
-                }
-                Err(message) => edit_error.set(Some(message.to_string())),
-            }
-            edit_pending.set(false);
-        });
-    };
-    let cancel_edit = Callback::new(move |_: ()| {
-        edit_title.set(title.get());
-        edit_artist.set(artist.get());
-        edit_link.set(link.get());
-        edit_tempo.set(
-            tempo
-                .get()
-                .map(|tempo| tempo.to_string())
-                .unwrap_or_default(),
-        );
-        edit_musical_key.set(musical_key.get().unwrap_or_default());
-        edit_error.set(None);
-        editing.set(false);
-    });
-    let delete_item = move |_| {
-        delete_pending.set(true);
-        delete_error.set(None);
-        leptos::task::spawn_local(async move {
-            match wishlist_delete(item_id).await {
-                Ok(()) => on_deleted.run(item_id),
-                Err(message) => delete_error.set(Some(message.to_string())),
-            }
-            confirming_delete.set(false);
-            delete_pending.set(false);
-        });
-    };
+    let member_id = current_member.id;
 
     view! {
         <article
             class="wishlist-item"
             class:is-medley=is_medley
-            class:is-editing=move || editing.get()
+            // class:is-editing=move || editing.get()
             class:needs-feedback=move || {
-                !feedbacks
-                    .get()
-                    .iter()
-                    .any(|feedback| feedback.member_id == member_id)
+                !item.get().feedback.iter().any(|feedback| feedback.member_id == member_id)
             }
             data-testid="wishlist-item"
         >
             <div class="wishlist-item-line">
                 <div class="wishlist-song-summary">
-                    <h3>{move || title.get()}</h3>
-                    <Show when=move || !artist.get().is_empty()>
-                        <span class="wishlist-artist">{move || artist.get()}</span>
+                    <h3>{move || item.get().title}</h3>
+                    <Show when=move || item.get().artist.is_some()>
+                        <span class="wishlist-artist">{move || item.get().artist}</span>
                     </Show>
-                    <Show when=move || link_badge_label.get().is_some()>
+                    <Show when=move || item.get().link_title.is_some()>
                         <a
                             class="wishlist-badge wishlist-link"
-                            href=move || link.get()
+                            href=move || item.get().link
                             target="_blank"
                             rel="noopener noreferrer"
-                            title=move || link_badge_label.get().unwrap_or_default()
+                            title=move || item.get().link_title.unwrap_or_default()
                         >
-                            {move || link_badge_label.get().unwrap_or_default()}
+                            {move || item.get().link_title.unwrap_or_default()}
                         </a>
                     </Show>
-                    <Show when=move || tempo.get().is_some()>
+                    <Show when=move || item.get().tempo.is_some()>
                         <span class="wishlist-badge wishlist-music-detail">
-                            {move || tr!("wishlist-tempo-badge", {"tempo" => tempo.get().unwrap_or_default().to_string()})}
+                            {move || tr!("wishlist-tempo-badge", {"tempo" => item.get().tempo.unwrap_or_default().to_string()})}
                         </span>
                     </Show>
-                    <Show when=move || musical_key.get().is_some()>
-                        <span class="wishlist-badge wishlist-music-detail">{move || musical_key.get().unwrap_or_default()}</span>
+                    <Show when=move || item.get().musical_key.is_some()>
+                        <span class="wishlist-badge wishlist-music-detail">{move || item.get().musical_key.unwrap_or_default()}</span>
                     </Show>
                 </div>
-                <Show when=move || !medley_management_active.get()>
+                <Show
+                    clone:current_member
+                    when=move || !medley_management_active.get()
+                >
                     <div class="wishlist-item-actions">
                         <WishlistFeedbackControl
-                            item_id
-                            member_id
-                            is_medley
-                            feedbacks
+                            item
+                            current_member=current_member.clone()
                             on_feedback_changed
                         />
-                        {if can_delete {
-                            view! {
-                                <button
-                                    class="btn btn-ghost btn-sm wishlist-edit-button"
-                                    type="button"
-                                    data-testid="wishlist-edit"
-                                    on:click=move |_| {
-                                        if editing.get() {
-                                            edit_title.set(title.get());
-                                            edit_artist.set(artist.get());
-                                            edit_link.set(link.get());
-                                            edit_tempo.set(tempo.get().map(|tempo| tempo.to_string()).unwrap_or_default());
-                                            edit_musical_key.set(musical_key.get().unwrap_or_default());
-                                            edit_error.set(None);
-                                            editing.set(false);
-                                        } else {
-                                            edit_title.set(title.get());
-                                            edit_artist.set(artist.get());
-                                            edit_link.set(link.get());
-                                            edit_tempo.set(tempo.get().map(|tempo| tempo.to_string()).unwrap_or_default());
-                                            edit_musical_key.set(musical_key.get().unwrap_or_default());
-                                            edit_error.set(None);
-                                            editing.set(true);
-                                        }
-                                    }
-                                    disabled=move || edit_pending.get()
-                                >
-                                    {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
-                                </button>
-                            }
-                            .into_any()
-                        } else {
-                            ().into_any()
-                        }
-                        }
+                        <EditSong
+                            item
+                            on_updated
+                            current_member=current_member.clone()
+                            on_deleted
+                        />
                     </div>
                 </Show>
             </div>
-            <Show when=move || editing.get()>
-                <button
-                    class="wishlist-edit-backdrop"
-                    type="button"
-                    aria-label=move || tr!("wishlist-close-edit")
-                    on:click=move |_| cancel_edit.run(())
-                    disabled=move || edit_pending.get()
-                ></button>
-                <form
-                    class="wishlist-edit-form"
-                    role="dialog"
-                    aria-modal="true"
-                    aria-label=move || tr!("wishlist-edit")
-                    on:submit=update_song
-                    on:keydown=move |event: leptos::ev::KeyboardEvent| {
-                        if event.key() == "Escape" && !edit_pending.get() {
-                            cancel_edit.run(());
-                        }
-                    }
-                >
-                    <label class="field">
-                        <span class="field-label">{move || tr!("wishlist-song-label")}</span>
-                        <input
-                            class="input"
-                            data-testid="wishlist-edit-title"
-                            maxlength="120"
-                            required
-                            prop:value=move || edit_title.get()
-                            on:input=move |event| edit_title.set(event_target_value(&event))
-                            disabled=move || edit_pending.get()
-                        />
-                    </label>
-                    <label class="field">
-                        <span class="field-label">{move || tr!("wishlist-artist-label")}</span>
-                        <input
-                            class="input"
-                            data-testid="wishlist-edit-artist"
-                            maxlength="120"
-                            prop:value=move || edit_artist.get()
-                            on:input=move |event| edit_artist.set(event_target_value(&event))
-                            disabled=move || edit_pending.get()
-                        />
-                    </label>
-                    <label class="field">
-                        <span class="field-label">{move || tr!("wishlist-link-label")}</span>
-                        <input
-                            class="input"
-                            data-testid="wishlist-edit-link"
-                            type="url"
-                            maxlength="2048"
-                            prop:value=move || edit_link.get()
-                            on:input=move |event| edit_link.set(event_target_value(&event))
-                            disabled=move || edit_pending.get()
-                        />
-                    </label>
-                    <label class="field">
-                        <span class="field-label">{move || tr!("wishlist-tempo-label")}</span>
-                        <input
-                            class="input"
-                            data-testid="wishlist-edit-tempo"
-                            type="number"
-                            min="20"
-                            max="300"
-                            step="1"
-                            placeholder="120"
-                            prop:value=move || edit_tempo.get()
-                            on:input=move |event| edit_tempo.set(event_target_value(&event))
-                            disabled=move || edit_pending.get()
-                        />
-                    </label>
-                    <label class="field">
-                        <span class="field-label">{move || tr!("wishlist-key-label")}</span>
-                        <select
-                            class="input"
-                            data-testid="wishlist-edit-key"
-                            prop:value=move || edit_musical_key.get()
-                            on:change=move |event| edit_musical_key.set(event_target_value(&event))
-                            disabled=move || edit_pending.get()
-                        >
-                            <option value="">{move || tr!("wishlist-key-unknown")}</option>
-                            {WISHLIST_MUSICAL_KEYS
-                                .iter()
-                                .map(|key| view! { <option value=*key>{*key}</option> })
-                                .collect_view()}
-                        </select>
-                    </label>
-                    <div class="wishlist-edit-actions">
-                        <button class="btn btn-primary btn-sm" type="submit" data-testid="wishlist-save-edit" disabled=move || edit_pending.get()>
-                            {move || if edit_pending.get() { tr!("wishlist-edit-saving") } else { tr!("wishlist-save-edit") }}
-                        </button>
-                        <button class="btn btn-ghost btn-sm" type="button" data-testid="wishlist-cancel-edit" on:click=move |_| cancel_edit.run(()) disabled=move || edit_pending.get()>
-                            {move || tr!("admin-cancel")}
-                        </button>
-                        {if can_delete {
-                            view! {
-                                <button
-                                    class="btn btn-ghost btn-danger btn-sm wishlist-delete-button"
-                                    type="button"
-                                    data-testid="wishlist-delete"
-                                    on:click=move |_| confirming_delete.set(true)
-                                    disabled=move || edit_pending.get()
-                                >
-                                    {move || tr!("wishlist-delete")}
-                                </button>
-                            }
-                            .into_any()
-                        } else {
-                            ().into_any()
-                        }}
-                    </div>
-                    <Show when=move || edit_error.get().is_some()>
-                        <p class="form-error" role="alert" data-testid="wishlist-edit-error">{move || edit_error.get().unwrap_or_default()}</p>
-                    </Show>
-                </form>
-            </Show>
-            <Show when=move || confirming_delete.get()>
-                <div class="admin-delete-backdrop">
-                    <section
-                        class="admin-delete-dialog"
-                        role="dialog"
-                        aria-modal="true"
-                        aria-label=move || tr!("wishlist-delete-title")
-                        on:keydown=move |event: leptos::ev::KeyboardEvent| {
-                            if event.key() == "Escape" && !delete_pending.get() {
-                                confirming_delete.set(false);
-                            }
-                        }
-                    >
-                        <div class="admin-delete-dialog-content">
-                            <h2>{move || tr!("wishlist-delete-title")}</h2>
-                            <p>{move || tr!("wishlist-confirm-delete", {"name" => confirm_title.get()})}</p>
-                            <Show when=move || delete_error.get().is_some()>
-                                <p class="form-error" role="alert">{move || delete_error.get().unwrap_or_default()}</p>
-                            </Show>
-                            <div class="admin-delete-dialog-actions">
-                                <button
-                                    class="btn btn-ghost btn-danger btn-sm"
-                                    type="button"
-                                    data-testid="wishlist-confirm-delete"
-                                    on:click=delete_item
-                                    disabled=move || delete_pending.get()
-                                >
-                                    {move || if delete_pending.get() {
-                                        tr!("wishlist-deleting")
-                                    } else {
-                                        tr!("wishlist-delete")
-                                    }}
-                                </button>
-                                <button
-                                    class="btn btn-ghost btn-sm"
-                                    type="button"
-                                    data-testid="wishlist-cancel-delete"
-                                    on:click=move |_| confirming_delete.set(false)
-                                    disabled=move || delete_pending.get()
-                                >
-                                    {move || tr!("admin-cancel")}
-                                </button>
-                            </div>
-                        </div>
-                    </section>
-                </div>
-            </Show>
         </article>
     }
     .into_any()
-}
-
-#[component]
-fn WishlistFeedbackControl(
-    item_id: uuid::Uuid,
-    member_id: uuid::Uuid,
-    is_medley: bool,
-    feedbacks: RwSignal<Vec<WishlistFeedback>>,
-    on_feedback_changed: Callback<(uuid::Uuid, Option<WishlistFeedback>)>,
-) -> AnyView {
-    let selected = RwSignal::new(
-        feedbacks
-            .get_untracked()
-            .iter()
-            .find(|feedback| feedback.member_id == member_id)
-            .map(|feedback| feedback.category),
-    );
-    let pending = RwSignal::new(false);
-    let error = RwSignal::new(Option::<String>::None);
-    let feedback_open = RwSignal::new(false);
-    let save_feedback = Callback::new(move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
-        let category = selected.get();
-        pending.set(true);
-        error.set(None);
-        leptos::task::spawn_local(async move {
-            match wishlist_set_feedback(item_id, category).await {
-                Ok(feedback) => {
-                    feedbacks.update(|feedbacks| {
-                        feedbacks.retain(|existing| existing.member_id != member_id);
-                        if let Some(feedback) = feedback.clone() {
-                            feedbacks.push(feedback);
-                            feedbacks.sort_by(|left, right| {
-                                left.member_name
-                                    .to_lowercase()
-                                    .cmp(&right.member_name.to_lowercase())
-                            });
-                        }
-                    });
-                    on_feedback_changed.run((item_id, feedback));
-                    feedback_open.set(false);
-                }
-                Err(message) => error.set(Some(message.to_string())),
-            }
-            pending.set(false);
-        });
-    });
-
-    view! {
-        <div class="wishlist-feedback-details" class:is-open=move || feedback_open.get()>
-            <button
-                class="wishlist-feedback-toggle"
-                type="button"
-                aria-expanded=move || feedback_open.get().to_string()
-                on:click=move |_| feedback_open.update(|open| *open = !*open)
-            >
-                {move || tr!("wishlist-feedback-summary", {"count" => feedbacks.get().len().to_string()})}
-            </button>
-            <Show when=move || feedback_open.get()>
-                <button
-                    class="wishlist-feedback-backdrop"
-                    type="button"
-                    aria-label=move || tr!("wishlist-feedback-close")
-                    on:click=move |_| feedback_open.set(false)
-                >                </button>
-                <div class="wishlist-feedback-content">
-                    <WishlistFeedbackBadges feedbacks />
-                    <WishlistFeedbackForm
-                        feedbacks
-                        member_id
-                        is_medley
-                        selected
-                        pending
-                        error
-                        on_save=save_feedback
-                    />
-                </div>
-            </Show>
-        </div>
-    }
-    .into_any()
-}
-
-#[component]
-fn WishlistMedleyFeedbackControl(
-    medley_id: uuid::Uuid,
-    member_id: uuid::Uuid,
-    feedbacks: RwSignal<Vec<WishlistMedleyFeedback>>,
-) -> AnyView {
-    let own_feedback = Memo::new(move |_| {
-        feedbacks
-            .get()
-            .into_iter()
-            .find(|feedback| feedback.medley_id == medley_id && feedback.member_id == member_id)
-    });
-    let selected = RwSignal::new(
-        own_feedback
-            .get_untracked()
-            .map(|feedback| feedback.category),
-    );
-    let pending = RwSignal::new(false);
-    let error = RwSignal::new(Option::<String>::None);
-    let feedback_open = RwSignal::new(false);
-    let save_feedback = Callback::new(move |event: leptos::ev::SubmitEvent| {
-        event.prevent_default();
-        let category = selected.get();
-        pending.set(true);
-        error.set(None);
-        leptos::task::spawn_local(async move {
-            match wishlist_set_medley_feedback(medley_id, category).await {
-                Ok(feedback) => {
-                    feedbacks.update(|feedbacks| {
-                        feedbacks.retain(|existing| {
-                            existing.medley_id != medley_id || existing.member_id != member_id
-                        });
-                        if let Some(feedback) = feedback {
-                            feedbacks.push(feedback);
-                            feedbacks.sort_by(|left, right| {
-                                left.member_name
-                                    .to_lowercase()
-                                    .cmp(&right.member_name.to_lowercase())
-                            });
-                        }
-                    });
-                    feedback_open.set(false);
-                }
-                Err(message) => error.set(Some(message.to_string())),
-            }
-            pending.set(false);
-        });
-    });
-
-    view! {
-        <div class="wishlist-feedback-details" class:is-open=move || feedback_open.get()>
-            <button
-                class="wishlist-feedback-toggle"
-                type="button"
-                aria-expanded=move || feedback_open.get().to_string()
-                on:click=move |_| feedback_open.update(|open| *open = !*open)
-            >
-                {move || tr!("wishlist-feedback-summary", {
-                    "count" => feedbacks
-                        .get()
-                        .iter()
-                        .filter(|feedback| feedback.medley_id == medley_id)
-                        .count()
-                        .to_string()
-                })}
-            </button>
-            <Show when=move || feedback_open.get()>
-                <button
-                    class="wishlist-feedback-backdrop"
-                    type="button"
-                    aria-label=move || tr!("wishlist-feedback-close")
-                    on:click=move |_| feedback_open.set(false)
-                ></button>
-                <WishlistMedleyFeedbackPanel
-                    medley_id
-                    member_id
-                    feedbacks
-                    selected
-                    pending
-                    error
-                    on_save=save_feedback
-                />
-            </Show>
-        </div>
-    }
-    .into_any()
-}
-
-#[component]
-fn WishlistMedleyFeedbackPanel(
-    medley_id: uuid::Uuid,
-    member_id: uuid::Uuid,
-    feedbacks: RwSignal<Vec<WishlistMedleyFeedback>>,
-    selected: RwSignal<Option<WishlistCategory>>,
-    pending: RwSignal<bool>,
-    error: RwSignal<Option<String>>,
-    on_save: Callback<leptos::ev::SubmitEvent>,
-) -> AnyView {
-    view! {
-        <div class="wishlist-feedback-content">
-            <WishlistMedleyFeedbackBadges medley_id feedbacks />
-            <WishlistMedleyFeedbackForm
-                medley_id
-                member_id
-                feedbacks
-                selected
-                pending
-                error
-                on_save
-            />
-        </div>
-    }
-    .into_any()
-}
-
-#[component]
-fn WishlistMedleyFeedbackBadges(
-    medley_id: uuid::Uuid,
-    feedbacks: RwSignal<Vec<WishlistMedleyFeedback>>,
-) -> AnyView {
-    view! {
-        <div class="wishlist-feedback-badges">
-            <For
-                each=move || {
-                    feedbacks
-                        .get()
-                        .into_iter()
-                        .filter(|feedback| feedback.medley_id == medley_id)
-                        .collect::<Vec<_>>()
-                }
-                key=|feedback| feedback.member_id
-                children=move |feedback| {
-                    let text = format!(
-                        "{}: {}",
-                        feedback.member_name,
-                        category_label(feedback.category)
-                    );
-                    view! { <span class="wishlist-badge">{text}</span> }
-                }
-            />
-            <Show when=move || {
-                !feedbacks
-                    .get()
-                    .iter()
-                    .any(|feedback| feedback.medley_id == medley_id)
-            }>
-                <span class="muted">{move || tr!("wishlist-feedback-empty")}</span>
-            </Show>
-        </div>
-    }
-    .into_any()
-}
-
-#[component]
-fn WishlistMedleyFeedbackForm(
-    medley_id: uuid::Uuid,
-    member_id: uuid::Uuid,
-    feedbacks: RwSignal<Vec<WishlistMedleyFeedback>>,
-    selected: RwSignal<Option<WishlistCategory>>,
-    pending: RwSignal<bool>,
-    error: RwSignal<Option<String>>,
-    on_save: Callback<leptos::ev::SubmitEvent>,
-) -> AnyView {
-    let has_own_feedback = Memo::new(move |_| {
-        feedbacks
-            .get()
-            .iter()
-            .any(|feedback| feedback.medley_id == medley_id && feedback.member_id == member_id)
-    });
-    view! {
-        <div>
-            <form class="wishlist-feedback-form" on:submit=move |event| on_save.run(event)>
-                <label class="field">
-                    <span class="field-label">{move || tr!("wishlist-medley-feedback-label")}</span>
-                    <select
-                        class="select"
-                        prop:value=move || selected.get().map(|value| value.to_string()).unwrap_or_default()
-                        on:change=move |event| {
-                            let value = event_target_value(&event);
-                            selected.set(if value.is_empty() { None } else { value.parse().ok() });
-                        }
-                        disabled=move || pending.get()
-                    >
-                        <Show when=move || has_own_feedback.get()>
-                            <option value="">{move || tr!("wishlist-feedback-none")}</option>
-                        </Show>
-                        <option value="song">{move || tr!("wishlist-category-song")}</option>
-                        <option value="medley">{move || tr!("wishlist-category-medley")}</option>
-                        <option value="try">{move || tr!("wishlist-category-try")}</option>
-                        <option value="unplayable">{move || tr!("wishlist-category-unplayable")}</option>
-                        <option value="other_ordering">{move || tr!("wishlist-category-other-ordering")}</option>
-                        <option value="not_fit_medley">{move || tr!("wishlist-category-not-fit-medley")}</option>
-                    </select>
-                </label>
-                <button
-                    class="btn btn-primary btn-sm"
-                    type="submit"
-                    disabled=move || pending.get() || (selected.get().is_none() && !has_own_feedback.get())
-                >
-                    {move || if pending.get() {
-                        tr!("wishlist-feedback-saving")
-                    } else {
-                        tr!("wishlist-feedback-save")
-                    }}
-                </button>
-            </form>
-            <Show when=move || error.get().is_some()>
-                <p class="form-error" role="alert">{move || error.get().unwrap_or_default()}</p>
-            </Show>
-        </div>
-    }
-    .into_any()
-}
-
-#[component]
-fn WishlistFeedbackBadges(feedbacks: RwSignal<Vec<WishlistFeedback>>) -> AnyView {
-    view! {
-        <div class="wishlist-feedback-badges">
-            <For
-                each=move || feedbacks.get()
-                key=|feedback| feedback.member_id
-                children=move |feedback| {
-                    let label = category_label(feedback.category);
-                    let text = format!("{}: {}", feedback.member_name, label);
-                    view! { <span class="wishlist-badge">{text}</span> }
-                }
-            />
-            <Show when=move || feedbacks.get().is_empty()>
-                <span class="muted">{move || tr!("wishlist-feedback-empty")}</span>
-            </Show>
-        </div>
-    }
-    .into_any()
-}
-
-#[component]
-fn WishlistFeedbackForm(
-    feedbacks: RwSignal<Vec<WishlistFeedback>>,
-    member_id: uuid::Uuid,
-    is_medley: bool,
-    selected: RwSignal<Option<WishlistCategory>>,
-    pending: RwSignal<bool>,
-    error: RwSignal<Option<String>>,
-    on_save: Callback<leptos::ev::SubmitEvent>,
-) -> AnyView {
-    let has_own_feedback = Memo::new(move |_| {
-        feedbacks
-            .get()
-            .iter()
-            .any(|feedback| feedback.member_id == member_id)
-    });
-    view! {
-        <div>
-            <form
-                class="wishlist-feedback-form"
-                on:submit=move |event| on_save.run(event)
-            >
-                <label class="field">
-                    <span class="field-label">{move || tr!("wishlist-feedback-label")}</span>
-                    <select
-                        class="select"
-                        data-testid="wishlist-feedback-select"
-                        prop:value=move || selected.get().map(|value| value.to_string()).unwrap_or_default()
-                        on:change=move |event| {
-                            let value = event_target_value(&event);
-                            selected.set(if value.is_empty() {
-                                None
-                            } else {
-                                value.parse::<WishlistCategory>().ok()
-                            });
-                        }
-                        disabled=move || pending.get()
-                    >
-                        <Show when=move || has_own_feedback.get()>
-                            <option value="">{move || tr!("wishlist-feedback-none")}</option>
-                        </Show>
-                        <option value="song">{move || tr!("wishlist-category-song")}</option>
-                        <Show when=move || !is_medley>
-                            <option value="medley">{move || tr!("wishlist-category-medley")}</option>
-                            <option value="try">{move || tr!("wishlist-category-try")}</option>
-                        </Show>
-                        <option value="unplayable">{move || tr!("wishlist-category-unplayable")}</option>
-                        <Show when=move || is_medley>
-                            <option value="other_ordering">{move || tr!("wishlist-category-other-ordering")}</option>
-                            <option value="not_fit_medley">{move || tr!("wishlist-category-not-fit-medley")}</option>
-                        </Show>
-                    </select>
-                </label>
-                <button
-                    class="btn btn-primary btn-sm"
-                    type="submit"
-                    data-testid="wishlist-feedback-save"
-                    disabled=move || pending.get() || (selected.get().is_none() && !has_own_feedback.get())
-                >
-                    {move || if pending.get() {
-                        tr!("wishlist-feedback-saving")
-                    } else {
-                        tr!("wishlist-feedback-save")
-                    }}
-                </button>
-            </form>
-            <Show when=move || error.get().is_some()>
-                <p class="form-error" role="alert">{move || error.get().unwrap_or_default()}</p>
-            </Show>
-        </div>
-    }
-    .into_any()
-}
-
-fn category_label(category: WishlistCategory) -> String {
-    match category {
-        WishlistCategory::Song => tr!("wishlist-category-song"),
-        WishlistCategory::Medley => tr!("wishlist-category-medley"),
-        WishlistCategory::Try => tr!("wishlist-category-try"),
-        WishlistCategory::Unplayable => tr!("wishlist-category-unplayable"),
-        WishlistCategory::OtherOrdering => tr!("wishlist-category-other-ordering"),
-        WishlistCategory::NotFitMedley => tr!("wishlist-category-not-fit-medley"),
-    }
-}
-
-fn link_label(link: &str) -> String {
-    let host = link
-        .split_once("://")
-        .map(|(_, rest)| rest)
-        .unwrap_or(link)
-        .split('/')
-        .next()
-        .unwrap_or_default()
-        .trim_start_matches("www.")
-        .to_ascii_lowercase();
-    if host == "youtube.com" || host == "youtu.be" || host.ends_with(".youtube.com") {
-        "YouTube".to_string()
-    } else {
-        host.to_string()
-    }
 }
 
 fn sort_wishlist_items(items: &mut [WishlistItem]) {
