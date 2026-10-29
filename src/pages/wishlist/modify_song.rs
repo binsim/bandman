@@ -1,5 +1,5 @@
 use super::WISHLIST_MUSICAL_KEYS;
-use crate::models::{Member, MemberRole, WishlistItem};
+use crate::{components::layout::PopupModal, models::{Member, MemberRole, WishlistItem}};
 #[cfg(feature = "ssr")]
 use crate::models::{WishlistCategory, WishlistSongDetails};
 use leptos::prelude::*;
@@ -118,92 +118,94 @@ pub fn WishlistSongFields(
         .collect_view();
 
     view! {
-        <label class="field">
-            <span class="field-label">{move || tr!("wishlist-song-label")}</span>
-            <input
-                class="input"
-                data-testid=title_test_id
-                type="text"
-                maxlength="120"
-                placeholder=move || {
-                    if with_placeholders {
-                        tr!("wishlist-song-placeholder")
-                    } else {
-                        String::new()
+        <div class="form-fields">
+            <label class="field">
+                <span class="field-label">{move || tr!("wishlist-song-label")}</span>
+                <input
+                    class="input"
+                    data-testid=title_test_id
+                    type="text"
+                    maxlength="120"
+                    placeholder=move || {
+                        if with_placeholders {
+                            tr!("wishlist-song-placeholder")
+                        } else {
+                            String::new()
+                        }
                     }
-                }
-                required
-                prop:value=move || title.get()
-                on:input=move |event| title.set(event_target_value(&event))
-                disabled=move || is_disabled.get()
-            />
-        </label>
-        <label class="field">
-            <span class="field-label">{move || tr!("wishlist-artist-label")}</span>
-            <input
-                class="input"
-                data-testid=artist_test_id
-                type="text"
-                maxlength="120"
-                placeholder=move || {
-                    if with_placeholders {
-                        tr!("wishlist-artist-placeholder")
-                    } else {
-                        String::new()
+                    required
+                    prop:value=move || title.get()
+                    on:input=move |event| title.set(event_target_value(&event))
+                    disabled=move || is_disabled.get()
+                />
+            </label>
+            <label class="field">
+                <span class="field-label">{move || tr!("wishlist-artist-label")}</span>
+                <input
+                    class="input"
+                    data-testid=artist_test_id
+                    type="text"
+                    maxlength="120"
+                    placeholder=move || {
+                        if with_placeholders {
+                            tr!("wishlist-artist-placeholder")
+                        } else {
+                            String::new()
+                        }
                     }
-                }
-                prop:value=move || artist.get()
-                on:input=move |event| artist.set(event_target_value(&event))
-                disabled=move || is_disabled.get()
-            />
-        </label>
-        <label class="field">
-            <span class="field-label">{move || tr!("wishlist-link-label")}</span>
-            <input
-                class="input"
-                data-testid=link_test_id
-                type="url"
-                maxlength="2048"
-                placeholder=move || {
-                    if with_placeholders {
-                        "https://".to_string()
-                    } else {
-                        String::new()
+                    prop:value=move || artist.get()
+                    on:input=move |event| artist.set(event_target_value(&event))
+                    disabled=move || is_disabled.get()
+                />
+            </label>
+            <label class="field">
+                <span class="field-label">{move || tr!("wishlist-link-label")}</span>
+                <input
+                    class="input"
+                    data-testid=link_test_id
+                    type="url"
+                    maxlength="2048"
+                    placeholder=move || {
+                        if with_placeholders {
+                            "https://".to_string()
+                        } else {
+                            String::new()
+                        }
                     }
-                }
-                prop:value=move || link.get()
-                on:input=move |event| link.set(event_target_value(&event))
-                disabled=move || is_disabled.get()
-            />
-        </label>
-        <label class="field">
-            <span class="field-label">{move || tr!("wishlist-tempo-label")}</span>
-            <input
-                class="input"
-                data-testid=tempo_test_id
-                type="number"
-                min="20"
-                max="300"
-                step="1"
-                placeholder="120"
-                prop:value=move || tempo.get()
-                on:input=move |event| tempo.set(event_target_value(&event))
-                disabled=move || is_disabled.get()
-            />
-        </label>
-        <label class="field">
-            <span class="field-label">{move || tr!("wishlist-key-label")}</span>
-            <select
-                class="input"
-                data-testid=key_test_id
-                prop:value=move || musical_key.get()
-                on:change=move |event| musical_key.set(event_target_value(&event))
-                disabled=move || is_disabled.get()
-            >
-                <option value="">{move || tr!("wishlist-key-unknown")}</option>
-                {key_options}
-            </select>
-        </label>
+                    prop:value=move || link.get()
+                    on:input=move |event| link.set(event_target_value(&event))
+                    disabled=move || is_disabled.get()
+                />
+            </label>
+            <label class="field">
+                <span class="field-label">{move || tr!("wishlist-tempo-label")}</span>
+                <input
+                    class="input"
+                    data-testid=tempo_test_id
+                    type="number"
+                    min="20"
+                    max="300"
+                    step="1"
+                    placeholder="120"
+                    prop:value=move || tempo.get()
+                    on:input=move |event| tempo.set(event_target_value(&event))
+                    disabled=move || is_disabled.get()
+                />
+            </label>
+            <label class="field">
+                <span class="field-label">{move || tr!("wishlist-key-label")}</span>
+                <select
+                    class="input"
+                    data-testid=key_test_id
+                    prop:value=move || musical_key.get()
+                    on:change=move |event| musical_key.set(event_target_value(&event))
+                    disabled=move || is_disabled.get()
+                >
+                    <option value="">{move || tr!("wishlist-key-unknown")}</option>
+                    {key_options}
+                </select>
+            </label>
+        </div>
     }
 }
 
@@ -235,7 +237,9 @@ pub fn EditSong(
             {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
         </button>
         <Show when= move || editing.get()>
-            <EditSongForm edit_pending editing confirm_delete item current_member=current_member.clone() on_updated />
+            <PopupModal clone:current_member>
+                <EditSongForm edit_pending editing confirm_delete item current_member=current_member.clone() on_updated />
+            </PopupModal>
         </Show>
         <Show when=move || confirm_delete.get()>
             <DeleteConfirmationForm
@@ -330,7 +334,7 @@ pub fn EditSongForm(
                 }
             >
                 <WishlistSongFields title artist link tempo musical_key/>
-                <div class="wishlist-edit-actions">
+                <div class="form-actions">
                     <button class="btn btn-primary btn-sm" type="submit" data-testid="wishlist-save-edit" disabled=move || edit_pending.get()>
                         {move || if edit_pending.get() { tr!("wishlist-edit-saving") } else { tr!("wishlist-save-edit") }}
                     </button>
@@ -485,22 +489,22 @@ pub fn CreateSong(
     };
 
     view! {
-        <section class="wishlist-form-card">
-            <h2>{move || tr!("wishlist-add-title")}</h2>
-            <form class="wishlist-form" on:submit=on_create>
-                <div class="wishlist-form-fields">
-                    <WishlistSongFields
-                        title
-                        artist
-                        link
-                        tempo
-                        musical_key
-                        with_placeholders=true
-                    />
-                </div>
+        <section class="card">
+            <header>
+                <h2>{move || tr!("wishlist-add-title")}</h2>
+            </header>
+            <form on:submit=on_create>
+                <WishlistSongFields
+                    title
+                    artist
+                    link
+                    tempo
+                    musical_key
+                    with_placeholders=true
+                />
 
                 <Show when=move || matching_title.get().is_some()>
-                    <p class="wishlist-duplicate-warning" role="status" data-testid="wishlist-duplicate-warning">
+                    <p class="form-error" role="status" data-testid="wishlist-duplicate-warning">
                         {move || if matching_title.get() == Some(true) {
                             tr!("wishlist-duplicate-exact")
                         } else {
@@ -509,7 +513,7 @@ pub fn CreateSong(
                     </p>
                 </Show>
 
-                <div class="wishlist-form-actions">
+                <div class="form-actions">
                     <button
                         class="btn btn-primary"
                         type="submit"

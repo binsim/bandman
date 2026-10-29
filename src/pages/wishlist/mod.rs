@@ -2,10 +2,9 @@ mod modify_song;
 mod wishlist_feedback_form;
 
 use crate::{
-    models::{
+    components::layout::{PageError, PageLoginRequired}, models::{
         Member, MemberRole, WISHLIST_MUSICAL_KEYS, WishlistCategory, WishlistFeedback, WishlistItem,
-    },
-    pages::wishlist::modify_song::EditSong,
+    }, pages::wishlist::modify_song::EditSong,
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
@@ -122,56 +121,28 @@ async fn wishlist_disband_medley(medley_id: uuid::Uuid) -> Result<(), ServerFnEr
 #[component]
 pub fn WishlistPage() -> impl IntoView {
     let member = expect_context::<Resource<Option<crate::models::Member>>>();
-    view! {
-        <Suspense fallback=|| view! {
-            <section class="wishlist-page">
-                <h1>{move || tr!("nav-wishlist")}</h1>
-                <p class="muted">{move || tr!("wishlist-loading")}</p>
-            </section>
-        }>
-            {move || match member.get() {
-                Some(Some(member)) => view! { <WishlistContent current_member=member /> }.into_any(),
-                Some(None) => view! {
-                    <section class="wishlist-page">
-                        <header class="wishlist-header">
-                            <h1>{move || tr!("nav-wishlist")}</h1>
-                            <p class="lead">{move || tr!("wishlist-sign-in")}</p>
-                            <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
-                        </header>
-                    </section>
-                }
-                .into_any(),
-                None => ().into_any(),
-            }}
-        </Suspense>
-    }
-}
-
-#[component]
-fn WishlistContent(current_member: Member) -> impl IntoView {
     let wishlist = Resource::new(|| (), |_| async move { wishlist_list().await });
     view! {
         <Suspense fallback=|| view! {
-            <section class="wishlist-page">
+            <section>
                 <h1>{move || tr!("nav-wishlist")}</h1>
                 <p class="muted">{move || tr!("wishlist-loading")}</p>
             </section>
         }>
-            {move || match wishlist.get() {
-                Some(Ok(items)) => view! {
-                    <WishlistLoaded
-                        initial_items=items
-                        current_member=current_member.clone()
-                    />
-                }.into_any(),
-                Some(Err(error)) => view! {
-                    <section class="wishlist-page">
-                        <h1>{move || tr!("nav-wishlist")}</h1>
-                        <p class="form-error" role="alert">{error.to_string()}</p>
-                    </section>
+            {move || match member.get().flatten() {
+                Some(member) => {
+                    match wishlist.get() {
+                        Some(Ok(items)) => view! {
+                            <WishlistLoaded
+                                initial_items=items
+                                current_member=member
+                            />
+                        }.into_any(),
+                        Some(Err(error)) => view! { <PageError title=tr!("nav-wishlist") content=error.to_string() /> }.into_any(),
+                        None => ().into_any(),
+                    }
                 }
-                .into_any(),
-                None => ().into_any(),
+                None => view! { <PageLoginRequired title={tr!("nav-wishlist")} content={tr!("wishlist-sign-in")} /> }.into_any(),
             }}
         </Suspense>
     }
@@ -409,32 +380,30 @@ fn WishlistLoaded(initial_items: Vec<WishlistItem>, current_member: Member) -> A
     });
 
     view! {
-        <section class="wishlist-page">
-            <header class="wishlist-header">
-                <p class="eyebrow">{move || tr!("wishlist-eyebrow")}</p>
-                <h1>{move || tr!("nav-wishlist")}</h1>
-                <p class="lead">{move || tr!("wishlist-lead")}</p>
-            </header>
-            <CreateSong items on_created=on_song_created />
-            <WishlistListing
-                items
-                visible_items
-                current_member
-                show_needs_feedback
-                on_filter_changed
-                selecting_medley
-                new_medley_name
-                selected_songs
-                medley_pending
-                medley_error
-                on_create_medley=create_medley
-                on_start_creating_medley=start_creating_medley
-                on_disband_medley=disband_medley
-                on_medley_renamed
-                on_remove_medley_item=remove_medley_item
-                on_move_medley_item=move_medley_item
-            />
+        <section>
+            <p class="eyebrow">{move || tr!("wishlist-eyebrow")}</p>
+            <h1>{move || tr!("nav-wishlist")}</h1>
+            <p class="lead">{move || tr!("wishlist-lead")}</p>
         </section>
+        <CreateSong items on_created=on_song_created />
+        <WishlistListing
+            items
+            visible_items
+            current_member
+            show_needs_feedback
+            on_filter_changed
+            selecting_medley
+            new_medley_name
+            selected_songs
+            medley_pending
+            medley_error
+            on_create_medley=create_medley
+            on_start_creating_medley=start_creating_medley
+            on_disband_medley=disband_medley
+            on_medley_renamed
+            on_remove_medley_item=remove_medley_item
+            on_move_medley_item=move_medley_item
+        />
     }
     .into_any()
 }
@@ -492,17 +461,49 @@ fn WishlistListing(
 ) -> AnyView {
     let entries = Memo::new(move |_| group_wishlist_items(visible_items.get()));
     view! {
-        <section class="wishlist-list" aria-labelledby="wishlist-list-title">
-            <div class="wishlist-list-header">
-                <h2 id="wishlist-list-title">{move || tr!("wishlist-list-title")}</h2>
-                <WishlistListHeader
-                    items
-                    show_needs_feedback
-                    on_filter_changed
-                    selecting_medley
-                    on_start_creating_medley
-                />
-            </div>
+        <section class="card">
+            <header>
+                <div style="display:flex; justify-content:space-between;width:100%">
+                    <h2 id="wishlist-list-title">{move || tr!("wishlist-list-title")}
+                        <span class="muted">{move || tr!("wishlist-count", {"count" => items.get().len().to_string()})}</span>
+                    </h2>
+
+                    <Show when=move || !selecting_medley.get()>
+                        <button
+                            class="btn btn-primary btn-sm"
+                            type="button"
+                            on:click=move |_| on_start_creating_medley.run(())
+                        >
+                            {move || tr!("wishlist-medley-start")}
+                        </button>
+                    </Show>
+                </div>
+            </header>
+
+            <Show when=move || !selecting_medley.get()>
+                <div class="wishlist-list-header-actions">
+                    <div class="wishlist-filter" role="group" aria-label=move || tr!("wishlist-filter-label")>
+                        <button
+                            class="wishlist-filter-button"
+                            class:is-active=move || show_needs_feedback.get()
+                            type="button"
+                            aria-pressed=move || show_needs_feedback.get().to_string()
+                            on:click=move |_| on_filter_changed.run(true)
+                        >
+                            {move || tr!("wishlist-filter-needs-feedback")}
+                        </button>
+                        <button
+                            class="wishlist-filter-button"
+                            class:is-active=move || !show_needs_feedback.get()
+                            type="button"
+                            aria-pressed=move || (!show_needs_feedback.get()).to_string()
+                            on:click=move |_| on_filter_changed.run(false)
+                        >
+                            {move || tr!("wishlist-filter-all")}
+                        </button>
+                    </div>
+                </div>
+            </Show>
             <WishlistMedleyControls
                 selecting_medley
                 new_medley_name
@@ -545,51 +546,6 @@ fn WishlistListing(
 }
 
 #[component]
-fn WishlistListHeader(
-    items: RwSignal<Vec<WishlistItem>>,
-    show_needs_feedback: RwSignal<bool>,
-    on_filter_changed: Callback<bool>,
-    selecting_medley: RwSignal<bool>,
-    on_start_creating_medley: Callback<()>,
-) -> AnyView {
-    view! {
-        <div class="wishlist-list-header-actions">
-            <span class="muted">{move || tr!("wishlist-count", {"count" => items.get().len().to_string()})}</span>
-            <div class="wishlist-filter" role="group" aria-label=move || tr!("wishlist-filter-label")>
-                <button
-                    class="wishlist-filter-button"
-                    class:is-active=move || show_needs_feedback.get()
-                    type="button"
-                    aria-pressed=move || show_needs_feedback.get().to_string()
-                    on:click=move |_| on_filter_changed.run(true)
-                >
-                    {move || tr!("wishlist-filter-needs-feedback")}
-                </button>
-                <button
-                    class="wishlist-filter-button"
-                    class:is-active=move || !show_needs_feedback.get()
-                    type="button"
-                    aria-pressed=move || (!show_needs_feedback.get()).to_string()
-                    on:click=move |_| on_filter_changed.run(false)
-                >
-                    {move || tr!("wishlist-filter-all")}
-                </button>
-            </div>
-            <Show when=move || !selecting_medley.get()>
-                <button
-                    class="btn btn-primary btn-sm wishlist-create-medley-button"
-                    type="button"
-                    on:click=move |_| on_start_creating_medley.run(())
-                >
-                    {move || tr!("wishlist-medley-start")}
-                </button>
-            </Show>
-        </div>
-    }
-    .into_any()
-}
-
-#[component]
 fn WishlistMedleyControls(
     selecting_medley: RwSignal<bool>,
     new_medley_name: RwSignal<String>,
@@ -600,43 +556,29 @@ fn WishlistMedleyControls(
 ) -> AnyView {
     let medley_management_active = expect_context::<RwSignal<bool>>();
     view! {
-        <div
-            class="wishlist-medley-controls"
-            class:is-selecting=move || selecting_medley.get()
-        >
-            <Show when=move || selecting_medley.get()>
-                <button
-                    class="btn btn-ghost btn-sm"
-                    type="button"
-                    on:click=move |_| {
-                        selecting_medley.set(false);
-                        medley_management_active.set(false);
-                        selected_songs.set(Vec::new());
-                        new_medley_name.set(String::new());
-                        medley_error.set(None);
-                    }
-                    disabled=move || medley_pending.get()
-                >
-                    {move || tr!("admin-cancel")}
-                </button>
-            </Show>
-            <Show when=move || selecting_medley.get()>
-                <span class="wishlist-medley-selection-hint">
-                    {move || tr!("wishlist-medley-create-hint")}
-                </span>
+        <Show when=move || selecting_medley.get()>
+            <div class="wishlist-medley-controls">
                 <div class="wishlist-medley-selection-actions">
-                    <span class="muted wishlist-medley-selected-count">
+                    <span class="muted">
                         {move || tr!("wishlist-medley-selected", {"count" => selected_songs.get().len().to_string()})}
                     </span>
                     <input
                         class="input wishlist-medley-name-input"
                         maxlength="120"
+                        style="max-width:22rem"
                         aria-label=move || tr!("wishlist-medley-name")
                         placeholder=move || tr!("wishlist-medley-name")
                         prop:value=move || new_medley_name.get()
                         on:input=move |event| new_medley_name.set(event_target_value(&event))
                         disabled=move || medley_pending.get()
                     />
+                </div>
+                <Show when=move || selected_songs.get().len() < 2 >
+                    <span class="form-error">
+                        {move || tr!("wishlist-medley-create-hint")}
+                    </span>
+                </Show>
+                <div class="wishlist-medley-selection-actions">
                     <button
                         class="btn btn-primary btn-sm"
                         type="button"
@@ -645,9 +587,23 @@ fn WishlistMedleyControls(
                     >
                         {move || if medley_pending.get() { tr!("wishlist-medley-saving") } else { tr!("wishlist-medley-create") }}
                     </button>
+                    <button
+                        class="btn btn-ghost btn-sm"
+                        type="button"
+                        on:click=move |_| {
+                            selecting_medley.set(false);
+                            medley_management_active.set(false);
+                            selected_songs.set(Vec::new());
+                            new_medley_name.set(String::new());
+                            medley_error.set(None);
+                        }
+                        disabled=move || medley_pending.get()
+                    >
+                        {move || tr!("admin-cancel")}
+                    </button>
                 </div>
-            </Show>
-        </div>
+            </div>
+        </Show>
     }
     .into_any()
 }
@@ -946,8 +902,8 @@ fn WishlistMedley(
             class:is-expanded=move || expanded.get()
             data-testid="wishlist-medley"
         >
-            <header class="wishlist-medley-header">
-                <div class="wishlist-medley-heading">
+            <header class="collapsable">
+                <div style="display: flex; align-items:center; gap: var(--space-2) var(--space-3);width:100%">
                     <button
                         class="wishlist-medley-toggle"
                         type="button"
@@ -961,31 +917,32 @@ fn WishlistMedley(
                     >
                         <span aria-hidden="true">{move || if expanded.get() { "▾" } else { "▸" }}</span>
                     </button>
-                    <h3>{move || medley_name.get()}</h3>
-                    <span class="muted">
-                        {move || tr!("wishlist-medley-song-count", {"count" => song_count.get().to_string()})}
-                    </span>
-                </div>
-                <div class="wishlist-medley-header-actions">
-                    // <Show
-                    //     clone:current_member
-                    //     when=move || !medley_management_active.get()
-                    // >
-                        // <WishlistFeedbackControl
-                        //     item_id=id
-                        //     current_member=current_member.clone()
-                        //     is_medley=true
-                        // />
-                    // </Show>
-                    <Show when=move || !medley_management_active.get() && can_manage && !selecting_medley.get()>
-                        <WishlistMedleyActions
-                            name=medley_name
-                            pending=medley_pending
-                            confirming=confirm_disband
-                            on_edit=start_editing
-                            on_confirm_disband=confirm_ungroup
-                        />
-                    </Show>
+                    <h3>{move || medley_name.get()}
+                        <span class="muted">
+                            {move || tr!("wishlist-medley-song-count", {"count" => song_count.get().to_string()})}
+                        </span>
+                    </h3>
+                    <div class="wishlist-medley-header-actions">
+                        // <Show
+                        //     clone:current_member
+                        //     when=move || !medley_management_active.get()
+                        // >
+                            // <WishlistFeedbackControl
+                            //     item_id=id
+                            //     current_member=current_member.clone()
+                            //     is_medley=true
+                            // />
+                        // </Show>
+                        <Show when=move || !medley_management_active.get() && can_manage && !selecting_medley.get()>
+                            <WishlistMedleyActions
+                                name=medley_name
+                                pending=medley_pending
+                                confirming=confirm_disband
+                                on_edit=start_editing
+                                on_confirm_disband=confirm_ungroup
+                            />
+                        </Show>
+                    </div>
                 </div>
             </header>
             <Show when=move || rename_error.get().is_some()>
@@ -1350,29 +1307,33 @@ fn WishlistRow(
         >
             <div class="wishlist-item-line">
                 <div class="wishlist-song-summary">
-                    <h3>{move || item.get().title}</h3>
-                    <Show when=move || item.get().artist.is_some()>
-                        <span class="wishlist-artist">{move || item.get().artist}</span>
-                    </Show>
-                    <Show when=move || item.get().link_title.is_some()>
-                        <a
-                            class="wishlist-badge wishlist-link"
-                            href=move || item.get().link
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title=move || item.get().link_title.unwrap_or_default()
-                        >
-                            {move || item.get().link_title.unwrap_or_default()}
-                        </a>
-                    </Show>
-                    <Show when=move || item.get().tempo.is_some()>
-                        <span class="wishlist-badge wishlist-music-detail">
-                            {move || tr!("wishlist-tempo-badge", {"tempo" => item.get().tempo.unwrap_or_default().to_string()})}
-                        </span>
-                    </Show>
-                    <Show when=move || item.get().musical_key.is_some()>
-                        <span class="wishlist-badge wishlist-music-detail">{move || item.get().musical_key.unwrap_or_default()}</span>
-                    </Show>
+                    <div>
+                        <h3>{move || item.get().title}</h3>
+                        <Show when=move || item.get().artist.is_some()>
+                            <span class="wishlist-artist">{move || item.get().artist}</span>
+                        </Show>
+                    </div>
+                    <div>
+                        <Show when=move || item.get().link_title.is_some()>
+                            <a
+                                class="wishlist-badge wishlist-link"
+                                href=move || item.get().link
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title=move || item.get().link_title.unwrap_or_default()
+                            >
+                                {move || item.get().link_title.unwrap_or_default()}
+                            </a>
+                        </Show>
+                        <Show when=move || item.get().tempo.is_some()>
+                            <span class="wishlist-badge wishlist-music-detail">
+                                {move || tr!("wishlist-tempo-badge", {"tempo" => item.get().tempo.unwrap_or_default().to_string()})}
+                            </span>
+                        </Show>
+                        <Show when=move || item.get().musical_key.is_some()>
+                            <span class="wishlist-badge wishlist-music-detail">{move || item.get().musical_key.unwrap_or_default()}</span>
+                        </Show>
+                    </div>
                 </div>
                 <Show
                     clone:current_member

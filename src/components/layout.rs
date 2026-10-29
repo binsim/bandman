@@ -8,6 +8,36 @@ use leptos_router::components::A;
 use leptos_router::hooks::use_location;
 
 #[component]
+pub fn PageLoginRequired(title: String, content: String) -> impl IntoView {
+    view! {
+        <section>
+            <h1>{title}</h1>
+            <p>{content}</p>
+            <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
+        </section>
+    }
+}
+
+#[component]
+pub fn PageError(title: String, content: String) -> impl IntoView {
+    view! {
+        <section>
+            <h1>{title}</h1>
+            <p class="from-error" role="alert">{content}</p>
+        </section>
+    }
+}
+
+#[component]
+pub fn PopupModal(children: Children) -> impl IntoView {
+    view! {
+        <div class="popup-modal">
+            {children()}
+        </div>
+    }
+}
+
+#[component]
 pub fn AppShell(children: Children) -> impl IntoView {
     let (nav_open, set_nav_open) = signal(false);
 
@@ -21,24 +51,24 @@ pub fn AppShell(children: Children) -> impl IntoView {
     provide_context(member);
 
     view! {
-            <header data-testid="topbar">
-                <div class="brand" style="border: none" on:click=move |_| set_nav_open.update(|open| *open = !*open)>
-                    <span class="mark">"♪"</span>
-                    <span class="name" data-testid="brand-name">"Bandman"</span>
-                </div>
-                <Suspense fallback=|| ()>
-                    {move || match member.get().flatten() {
-                        Some(m) => view! {
-                            <Navigation role=m.role navigation_open=nav_open.get() />
-                            <UserIcon member=m/>
-                        }.into_any(),
-                        None => view! { <LoginButton /> }.into_any()
-                    }}
-                </Suspense>
-            </header>
-            <main>
-                {children()}
-            </main>
+        <header data-testid="topbar">
+            <div class="brand" style="border: none" on:click=move |_| set_nav_open.update(|open| *open = !*open)>
+                <span class="mark">"♪"</span>
+                <span class="name" data-testid="brand-name">"Bandman"</span>
+            </div>
+            <Suspense fallback=|| ()>
+                {move || match member.get().flatten() {
+                    Some(m) => view! {
+                        <Navigation role=m.role navigation_open=nav_open.get() />
+                        <UserIcon member=m/>
+                    }.into_any(),
+                    None => view! { <LoginButton /> }.into_any()
+                }}
+            </Suspense>
+        </header>
+        <main>
+            {children()}
+        </main>
     }
 }
 #[component]
