@@ -2,7 +2,7 @@ use crate::auth::{current_member, logout};
 use crate::components::language::LanguageSwitcher;
 use crate::components::theme::ThemeToggle;
 use crate::models::{Member, MemberRole};
-use leptos::prelude::*;
+use leptos::{ev, prelude::*};
 use leptos_fluent::tr;
 use leptos_router::components::A;
 use leptos_router::hooks::use_location;
@@ -20,6 +20,9 @@ pub fn PopupModal(children: Children) -> impl IntoView {
 pub fn AppShell(children: Children) -> impl IntoView {
     let (nav_open, set_nav_open) = signal(false);
 
+    let listener = window_event_listener(ev::click, move |_| set_nav_open.set(false));
+    on_cleanup(move || listener.remove());
+
     let auth_revision = RwSignal::new(0_u64);
     provide_context(auth_revision);
 
@@ -31,7 +34,7 @@ pub fn AppShell(children: Children) -> impl IntoView {
 
     view! {
         <header data-testid="topbar">
-            <div class="brand" style="border: none" on:click=move |_| set_nav_open.update(|open| *open = !*open)>
+            <div class="brand" style="border: none" on:click=move |ev| { set_nav_open.update(|open| *open = !*open); ev.stop_propagation();}>
                 <span class="mark">"♪"</span>
                 <span class="name" data-testid="brand-name">"Bandman"</span>
             </div>
@@ -93,6 +96,8 @@ fn LoginButton() -> impl IntoView {
 #[component]
 fn UserIcon(member: Member) -> impl IntoView {
     let (menu_open, set_menu_open) = signal(false);
+    let listener = window_event_listener(ev::click, move |_| set_menu_open.set(false));
+    on_cleanup(move || listener.remove());
 
     let auth_revision = expect_context::<RwSignal<u64>>();
     let logout_action = Action::new(move |_| {
@@ -111,7 +116,7 @@ fn UserIcon(member: Member) -> impl IntoView {
     });
 
     view! {
-        <div class="user-icon-container">
+        <div class="user-icon-container" on:click=|ev| ev.stop_propagation()>
         <button class="user-icon btn-ghost" data-testid="user-icon" on:click=move |_| set_menu_open.update(|open| *open = !*open)>{get_user_icon_content(&member.name)}
         </button>
         <Show when=move || menu_open.get()>
