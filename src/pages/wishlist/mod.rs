@@ -1020,7 +1020,6 @@ fn WishlistMedley(
                                         <WishlistRow
                                             item=item.clone()
                                             current_member=member_store.read_value().clone()
-                                            is_medley=true
                                             on_feedback_changed
                                             on_deleted
                                             on_updated
@@ -1201,11 +1200,7 @@ fn WishlistListItem(
         });
     };
     view! {
-        <div
-            class="wishlist-medley-song"
-            class:is-grouped=grouped
-            class:is-manageable=grouped && can_manage_medley
-        >
+        <div class="wishlist-medley-song">
             <Show when=move || selecting_medley.get() && !grouped>
                 <label class="wishlist-medley-select">
                     <input
@@ -1240,7 +1235,6 @@ fn WishlistListItem(
                 on_feedback_changed
                 on_deleted
                 on_updated
-                is_medley=grouped
             />
             <Show when=move || grouped && can_manage_medley>
                 <div class="wishlist-medley-order-controls">
@@ -1297,7 +1291,6 @@ fn WishlistListItem(
 fn WishlistRow(
     item: WishlistItem,
     current_member: Member,
-    is_medley: bool,
     on_feedback_changed: Callback<(uuid::Uuid, Option<WishlistFeedback>)>,
     on_deleted: Callback<uuid::Uuid>,
     on_updated: Callback<WishlistItem>,
@@ -1310,8 +1303,6 @@ fn WishlistRow(
     view! {
         <article
             class="wishlist-item"
-            class:is-medley=is_medley
-            // class:is-editing=move || editing.get()
             class:needs-feedback=move || {
                 !item.get().feedback.iter().any(|feedback| feedback.member_id == member_id)
             }
