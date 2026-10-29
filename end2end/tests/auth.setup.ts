@@ -28,8 +28,12 @@ async function createMember(
     },
   });
   if (!response.ok()) {
+    var errorMessage = await response.text();
+    if (errorMessage === "A member with this name already exists") {
+      return;
+    }
     throw new Error(
-      `Creating member failed: ${response.status()} ${await response.text()}`,
+      `Creating member failed: ${response.status()} ${errorMessage}`,
     );
   }
 }

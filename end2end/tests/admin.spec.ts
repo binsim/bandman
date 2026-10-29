@@ -87,7 +87,6 @@ test.describe("Admin user logged in", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/admin", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
-    await page.getByRole("link", { name: "Admin" }).click();
 
     nameInput = page.getByTestId(ADD_MEMBER_NAME_INPUT);
     roleSelect = page.getByTestId(ADD_MEMBER_ROLE_SELECT);

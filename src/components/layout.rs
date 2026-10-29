@@ -8,27 +8,6 @@ use leptos_router::components::A;
 use leptos_router::hooks::use_location;
 
 #[component]
-pub fn PageLoginRequired(title: String, content: String) -> impl IntoView {
-    view! {
-        <section>
-            <h1>{title}</h1>
-            <p>{content}</p>
-            <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
-        </section>
-    }
-}
-
-#[component]
-pub fn PageError(title: String, content: String) -> impl IntoView {
-    view! {
-        <section>
-            <h1>{title}</h1>
-            <p class="from-error" role="alert">{content}</p>
-        </section>
-    }
-}
-
-#[component]
 pub fn PopupModal(children: Children) -> impl IntoView {
     view! {
         <div class="popup-modal">

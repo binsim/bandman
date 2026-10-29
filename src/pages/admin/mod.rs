@@ -1,7 +1,6 @@
 mod create_member;
 
 use crate::{
-    components::layout::{PageError, PageLoginRequired},
     models::{Member, MemberRole},
     pages::admin::create_member::CreateMemberForm,
 };
@@ -71,11 +70,22 @@ pub fn AdminPage() -> impl IntoView {
                         Some(Ok(members)) => view! {
                             <AdminMembersLoaded members current_member=member />
                         }.into_any(),
-                        Some(Err(error)) => view! { <PageError title={tr!("admin-title")} content=error.to_string() /> }.into_any(),
+                        Some(Err(error)) => view! {
+                            <section>
+                                <h1>{tr!("admin-title")}</h1>
+                                <p class="form-error">{error.to_string()}</p>
+                            </section>
+                        }.into_any(),
                         None => ().into_any(),
                     }}
                 }.into_any(),
-                _ => view! { <PageLoginRequired title={tr!("admin-title")} content=tr!("admin-access-denied-title") /> }.into_any(),
+                _ => view! {
+                    <section>
+                        <h1>{tr!("admin-title")}</h1>
+                        <p class="form-error" data-testid="admin-access-denied">{tr!("admin-access-denied-title")}</p>
+                        <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
+                    </section>
+                }.into_any()
             }}
         </Suspense>
     }

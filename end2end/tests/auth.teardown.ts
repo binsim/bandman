@@ -24,7 +24,7 @@ test("remove test users", async ({ browser }) => {
         return;
       }
 
-      context.request.post("/api/admin_delete_member", {
+      return context.request.post("/api/admin_delete_member", {
         form: { member_id: user.id },
       });
     }),

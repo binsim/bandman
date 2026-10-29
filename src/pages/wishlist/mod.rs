@@ -2,7 +2,6 @@ mod modify_song;
 mod wishlist_feedback_form;
 
 use crate::{
-    components::layout::{PageError, PageLoginRequired},
     models::{
         Member, MemberRole, WISHLIST_MUSICAL_KEYS, WishlistCategory, WishlistFeedback, WishlistItem,
     },
@@ -140,11 +139,22 @@ pub fn WishlistPage() -> impl IntoView {
                                 current_member=member
                             />
                         }.into_any(),
-                        Some(Err(error)) => view! { <PageError title=tr!("nav-wishlist") content=error.to_string() /> }.into_any(),
+                        Some(Err(error)) => view! {
+                            <section>
+                                <h1>{tr!("nav-wishlist")}</h1>
+                                <p class="from-error" role="alert">{error.to_string()}</p>
+                            </section>
+                        }.into_any(),
                         None => ().into_any(),
                     }
                 }
-                None => view! { <PageLoginRequired title={tr!("nav-wishlist")} content={tr!("wishlist-sign-in")} /> }.into_any(),
+                None => view! {
+                    <section>
+                        <h1>{tr!("nav-wishlist")}</h1>
+                        <p>{tr!("wishlist-sign-in")}</p>
+                        <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
+                    </section>
+                }.into_any(),
             }}
         </Suspense>
     }
