@@ -1,0 +1,25 @@
+@use "../shared/tokens";
+
+.login-page {
+  display: grid;
+  place-items: center;
+  min-height: calc(100vh - var(--topbar-height) - 4rem);
+}
+
+.login-card {
+  width: min(100%, 26rem);
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+}
+
+.login-title {
+  font-size: clamp(1.75rem, 4vw, 2.15rem);
+}
+
+.login-lead {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-5);
+}

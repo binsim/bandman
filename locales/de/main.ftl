@@ -7,6 +7,8 @@ nav-finance = Finanzen
 nav-admin = Admin
 nav-login = Anmelden
 nav-logout = Abmelden
+nav-menu-label = Menü öffnen
+nav-close-menu = Menü schließen
 
 ## Theme
 theme-toggle = Farbschema umschalten

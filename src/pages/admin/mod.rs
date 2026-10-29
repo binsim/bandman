@@ -53,47 +53,39 @@ pub(super) async fn admin_delete_member(member_id: Uuid) -> Result<(), ServerFnE
 #[component]
 pub fn AdminPage() -> impl IntoView {
     let current_member = expect_context::<Resource<Option<Member>>>();
-    view! {
-        <Suspense fallback=|| view! {
-            <p class="muted">{move || tr!("admin-loading")}</p>
-        }>
-            {move || match current_member.get().flatten() {
-                Some(member) if member.role == MemberRole::Admin => view! {
-                    <section class="admin-page">
-                        <header class="admin-header">
-                            <p class="eyebrow">{move || tr!("admin-eyebrow")}</p>
-                            <h1>{move || tr!("admin-title")}</h1>
-                            <p class="lead">{move || tr!("admin-lead")}</p>
-                        </header>
-                        <AdminContent current_member=member />
-                    </section>
-                }.into_any(),
-                _ => view! {
-                    <section class="admin-card" data-testid="admin-access-denied">
-                        <h2>{move || tr!("admin-access-denied-title")}</h2>
-                    </section>
-                }.into_any(),
-            }}
-        </Suspense>
-    }
-}
-
-#[component]
-fn AdminContent(current_member: Member) -> impl IntoView {
     let members = Resource::new(|| (), |_| async move { admin_list_members().await });
 
     view! {
         <Suspense fallback=|| view! {
             <p class="muted">{move || tr!("admin-loading")}</p>
         }>
-            {move || match members.get() {
-                Some(Ok(members)) => view! {
-                    <AdminMembersLoaded members current_member=current_member.clone() />
+            {move || match current_member.get().flatten() {
+                Some(member) if member.role == MemberRole::Admin => view! {
+                    <section>
+                        <p class="eyebrow">{move || tr!("admin-eyebrow")}</p>
+                        <h1>{move || tr!("admin-title")}</h1>
+                        <p class="lead">{move || tr!("admin-lead")}</p>
+                    </section>
+                    {match members.get() {
+                        Some(Ok(members)) => view! {
+                            <AdminMembersLoaded members current_member=member />
+                        }.into_any(),
+                        Some(Err(error)) => view! {
+                            <section>
+                                <h1>{tr!("admin-title")}</h1>
+                                <p class="form-error">{error.to_string()}</p>
+                            </section>
+                        }.into_any(),
+                        None => ().into_any(),
+                    }}
                 }.into_any(),
-                Some(Err(error)) => view! {
-                    <p class="form-error" role="alert">{error.to_string()}</p>
-                }.into_any(),
-                None => ().into_any(),
+                _ => view! {
+                    <section>
+                        <h1>{tr!("admin-title")}</h1>
+                        <p class="form-error" data-testid="admin-access-denied">{tr!("admin-access-denied-title")}</p>
+                        <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
+                    </section>
+                }.into_any()
             }}
         </Suspense>
     }
@@ -122,22 +114,15 @@ fn AdminMembersLoaded(members: Vec<Member>, current_member: Member) -> impl Into
     });
 
     view! {
-        <div class="admin-content">
-            {view! { <CreateMemberForm on_created=on_member_created /> }.into_any()}
-            {
-                view! {
-                    <MembersTable
-                        members
-                        current_member
-                        on_member_updated=on_member_updated
-                        on_member_deleted
-                        feedback
-                    />
-                }
-            }
-        </div>
+        <CreateMemberForm on_created=on_member_created />
+        <MembersTable
+            members
+            current_member
+            on_member_updated=on_member_updated
+            on_member_deleted
+            feedback
+        />
     }
-    .into_any()
 }
 
 fn sort_members(members: &mut [Member]) {
@@ -158,8 +143,10 @@ fn MembersTable(
     feedback: RwSignal<MemberFeedback>,
 ) -> impl IntoView {
     view! {
-        <section class="admin-card">
-            <h2>{move || tr!("admin-members-title")}</h2>
+        <section class="card">
+            <header>
+                <h2>{move || tr!("admin-members-title")}</h2>
+            </header>
             <div class="admin-table-wrap">
                 <table class="admin-table">
                     <thead>

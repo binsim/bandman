@@ -23,8 +23,23 @@ export default defineConfig({
   },
   projects: [
     {
+      name: "setup",
+      testMatch: /auth\.setup\.ts/,
+      teardown: "cleanup",
+    },
+    {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+      dependencies: ["setup"],
+    },
+    {
+      name: "mobile",
+      use: { ...devices["iPhone 15"] },
+      dependencies: ["setup"],
+    },
+    {
+      name: "cleanup",
+      testMatch: /auth\.teardown\.ts/,
     },
   ],
 });

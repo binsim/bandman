@@ -1,5 +1,10 @@
 import { expect, Locator, Page, test } from "@playwright/test";
-import { gotoHydrated, isArraySorted, loginAsAdmin } from "./helpers";
+import {
+  ADMIN_FILE,
+  isArraySorted,
+  MEMBER_FILE,
+  PARTICIPANT_FILE,
+} from "./helpers";
 import { randomUUID } from "node:crypto";
 
 const ADD_MEMBER_NAME_INPUT = "admin-member-name";
@@ -18,16 +23,42 @@ const MEMBER_ROW_ERROR = "admin-row-error";
 const DELETE_POPUP_CONFIRM_DELETE_BUTTON = "admin-confirm-delete";
 const DELETE_POPUP_CANCEL_DELETE_BUTTON = "admin-cancel-delete";
 
-test.describe("Unauthorized access", () => {
-  test("redirects to login when not logged in", async ({ page }) => {
-    await gotoHydrated(page, "/admin");
+test.describe("No user logged in", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
+  });
 
-    // expect(page.url()).toContain("/login");
+  test("page should not be accessible", async ({ page }) => {
     await expect(page.getByTestId("admin-access-denied")).toBeVisible();
   });
 });
 
-test.describe("Admin member management", () => {
+test.describe("Member user logged in", () => {
+  test.use({ storageState: MEMBER_FILE });
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
+  });
+
+  test("page should not be accessible", async ({ page }) => {
+    await expect(page.getByTestId("admin-access-denied")).toBeVisible();
+  });
+});
+
+test.describe("Participant user logged in", () => {
+  test.use({ storageState: PARTICIPANT_FILE });
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
+  });
+
+  test("page should not be accessible", async ({ page }) => {
+    await expect(page.getByTestId("admin-access-denied")).toBeVisible();
+  });
+});
+
+test.describe("Admin user logged in", () => {
   let nameInput: Locator;
   let roleSelect: Locator;
   let createButton: Locator;
@@ -52,36 +83,14 @@ test.describe("Admin member management", () => {
     );
   }
 
+  test.use({ storageState: ADMIN_FILE });
   test.beforeEach(async ({ page }) => {
-    await loginAsAdmin(page);
-    await page.getByRole("link", { name: "Admin" }).click();
+    await page.goto("/admin", { waitUntil: "networkidle" });
+    await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
 
     nameInput = page.getByTestId(ADD_MEMBER_NAME_INPUT);
     roleSelect = page.getByTestId(ADD_MEMBER_ROLE_SELECT);
     createButton = page.getByTestId(ADD_MEMBER_CREATE_BUTTON);
-  });
-
-  test("denies access when not admin", async ({ page }) => {
-    const [createdMember, memberName] = await createMember(page);
-
-    page.getByTestId("logout-button").click();
-
-    await gotoHydrated(page, "/login");
-
-    await page
-      .getByTestId("login-member-select")
-      .selectOption({ label: memberName });
-    await page.getByTestId("login-submit").click();
-
-    await gotoHydrated(page, "/admin");
-
-    await expect(page.getByTestId("admin-access-denied")).toBeVisible();
-
-    await loginAsAdmin(page);
-    await gotoHydrated(page, "/admin");
-
-    await createdMember.getByTestId(MEMBER_ROW_DELETE_BUTTON).click();
-    await createdMember.getByTestId(DELETE_POPUP_CONFIRM_DELETE_BUTTON).click();
   });
 
   test("Add member is well formatted", async ({ page }) => {
