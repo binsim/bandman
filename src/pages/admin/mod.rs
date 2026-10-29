@@ -1,7 +1,9 @@
 mod create_member;
 
 use crate::{
-    components::layout::{PageError, PageLoginRequired}, models::{Member, MemberRole}, pages::admin::create_member::CreateMemberForm,
+    components::layout::{PageError, PageLoginRequired},
+    models::{Member, MemberRole},
+    pages::admin::create_member::CreateMemberForm,
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;

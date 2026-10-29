@@ -2,9 +2,11 @@ mod modify_song;
 mod wishlist_feedback_form;
 
 use crate::{
-    components::layout::{PageError, PageLoginRequired}, models::{
+    components::layout::{PageError, PageLoginRequired},
+    models::{
         Member, MemberRole, WISHLIST_MUSICAL_KEYS, WishlistCategory, WishlistFeedback, WishlistItem,
-    }, pages::wishlist::modify_song::EditSong,
+    },
+    pages::wishlist::modify_song::EditSong,
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;

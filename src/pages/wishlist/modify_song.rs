@@ -1,7 +1,10 @@
 use super::WISHLIST_MUSICAL_KEYS;
-use crate::{components::layout::PopupModal, models::{Member, MemberRole, WishlistItem}};
 #[cfg(feature = "ssr")]
 use crate::models::{WishlistCategory, WishlistSongDetails};
+use crate::{
+    components::layout::PopupModal,
+    models::{Member, MemberRole, WishlistItem},
+};
 use leptos::prelude::*;
 use leptos_fluent::tr;
 
@@ -220,7 +223,7 @@ pub fn EditSong(
     let edit_pending = RwSignal::new(false);
     let confirm_delete = RwSignal::new(false);
 
-    return view! {
+    view! {
         <button
             class="btn btn-ghost btn-sm wishlist-edit-button"
             type="button"
@@ -249,7 +252,7 @@ pub fn EditSong(
                 on_deleted
             />
         </Show>
-    }.into_any();
+    }.into_any()
 }
 
 #[component]
