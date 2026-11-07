@@ -20,8 +20,10 @@ pub fn WishlistFeedbackControl(
     current_member: Member,
     on_feedback_changed: Callback<(uuid::Uuid, Option<WishlistFeedback>)>,
 ) -> AnyView {
+    let initial_item = item.get_untracked();
+    let is_medley = initial_item.medley_id.is_some();
     let selected = RwSignal::new(
-        item.get()
+        initial_item
             .feedback
             .iter()
             .find(|feedback| feedback.member_id == current_member.id)
@@ -30,14 +32,14 @@ pub fn WishlistFeedbackControl(
     let pending = RwSignal::new(false);
     let error = RwSignal::new(Option::<String>::None);
     let feedback_open = RwSignal::new(false);
-    let feedbacks = RwSignal::new(item.get().feedback);
+    let feedbacks = RwSignal::new(initial_item.feedback);
     let save_feedback = Callback::new(move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
-        let category = selected.get();
+        let category = selected.get_untracked();
         pending.set(true);
         error.set(None);
         leptos::task::spawn_local(async move {
-            match super::wishlist_set_feedback(item.get().id, category).await {
+            match super::wishlist_set_feedback(item.get_untracked().id, category).await {
                 Ok(feedback) => {
                     item.update(|item| {
                         item.feedback
@@ -51,8 +53,8 @@ pub fn WishlistFeedbackControl(
                             });
                         }
                     });
-                    feedbacks.set(item.get().feedback);
-                    on_feedback_changed.run((item.get().id, feedback));
+                    feedbacks.set(item.get_untracked().feedback);
+                    on_feedback_changed.run((item.get_untracked().id, feedback));
                     feedback_open.set(false);
                 }
                 Err(message) => error.set(Some(message.to_string())),
@@ -86,7 +88,7 @@ pub fn WishlistFeedbackControl(
                     <WishlistFeedbackForm
                         feedbacks
                         current_member=current_member.clone()
-                        is_medley=item.get().medley_id.is_some()
+                        is_medley
                         selected
                         pending
                         error
