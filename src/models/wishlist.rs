@@ -94,14 +94,6 @@ pub struct WishlistFeedback {
     pub category: WishlistCategory,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WishlistMedleyFeedback {
-    pub medley_id: Uuid,
-    pub member_id: Uuid,
-    pub member_name: String,
-    pub category: WishlistCategory,
-}
-
 #[cfg(feature = "ssr")]
 #[derive(Debug, thiserror::Error)]
 pub enum WishlistError {
@@ -222,80 +214,6 @@ impl WishlistItem {
             }
         }
         Ok(items)
-    }
-
-    pub async fn list_medley_feedback(
-        pool: &PgPool,
-    ) -> Result<Vec<WishlistMedleyFeedback>, WishlistError> {
-        let rows: Vec<(Uuid, Uuid, String, String)> = sqlx::query_as(
-            r#"
-            SELECT feedback.medley_id, feedback.member_id, members.name, feedback.category
-            FROM wishlist_medley_feedback AS feedback
-            JOIN members ON members.id = feedback.member_id
-            ORDER BY lower(members.name), members.name
-            "#,
-        )
-        .fetch_all(pool)
-        .await?;
-        rows.into_iter()
-            .map(|(medley_id, member_id, member_name, category)| {
-                Ok(WishlistMedleyFeedback {
-                    medley_id,
-                    member_id,
-                    member_name,
-                    category: category
-                        .parse()
-                        .map_err(|error| sqlx::Error::ColumnDecode {
-                            index: "category".to_string(),
-                            source: Box::new(error),
-                        })?,
-                })
-            })
-            .collect::<Result<_, sqlx::Error>>()
-            .map_err(WishlistError::from)
-    }
-
-    pub async fn set_medley_feedback(
-        pool: &PgPool,
-        medley_id: Uuid,
-        member_id: Uuid,
-        category: Option<WishlistCategory>,
-    ) -> Result<Option<WishlistMedleyFeedback>, WishlistError> {
-        let Some(category) = category else {
-            sqlx::query(
-                "DELETE FROM wishlist_medley_feedback WHERE medley_id = $1 AND member_id = $2",
-            )
-            .bind(medley_id)
-            .bind(member_id)
-            .execute(pool)
-            .await?;
-            return Ok(None);
-        };
-
-        let row: Option<(String,)> = sqlx::query_as(
-            r#"
-            INSERT INTO wishlist_medley_feedback (medley_id, member_id, category)
-            SELECT $1, $2, $3
-            WHERE EXISTS (SELECT 1 FROM wishlist_medleys WHERE id = $1)
-            ON CONFLICT (medley_id, member_id)
-            DO UPDATE SET category = EXCLUDED.category, updated_at = NOW()
-            RETURNING (SELECT name FROM members WHERE id = $2)
-            "#,
-        )
-        .bind(medley_id)
-        .bind(member_id)
-        .bind(category.to_string())
-        .fetch_optional(pool)
-        .await?;
-        let Some((member_name,)) = row else {
-            return Err(WishlistError::NotFound);
-        };
-        Ok(Some(WishlistMedleyFeedback {
-            medley_id,
-            member_id,
-            member_name,
-            category,
-        }))
     }
 
     pub async fn create_medley(
@@ -1524,90 +1442,6 @@ mod tests {
             .expect("wishlist item should remain");
         assert_eq!(remaining.feedback.len(), 1);
         assert_eq!(remaining.feedback[0].member_id, second_member.id);
-    }
-
-    #[sqlx::test(migrations = "./migrations")]
-    async fn medley_feedback_can_be_updated_removed_and_is_listed_and_cascaded(pool: PgPool) {
-        let member = Member::create(
-            &pool,
-            &format!("Medley feedback member {}", Uuid::new_v4()),
-            crate::models::MemberRole::Member,
-        )
-        .await
-        .expect("member should be created");
-        let mut song_ids = Vec::new();
-        for title in ["Feedback medley song one", "Feedback medley song two"] {
-            song_ids.push(
-                WishlistItem::create(
-                    &pool,
-                    title,
-                    None,
-                    None,
-                    None,
-                    &[],
-                    WishlistCategory::Song,
-                    member.id,
-                    &member.name,
-                )
-                .await
-                .expect("song should be created")
-                .id,
-            );
-        }
-        let medley_id = WishlistItem::create_medley(&pool, &song_ids, "Feedback medley", member.id)
-            .await
-            .expect("medley should be created");
-
-        WishlistItem::set_medley_feedback(&pool, medley_id, member.id, Some(WishlistCategory::Try))
-            .await
-            .expect("medley feedback should be saved");
-        WishlistItem::set_medley_feedback(
-            &pool,
-            medley_id,
-            member.id,
-            Some(WishlistCategory::NotFitMedley),
-        )
-        .await
-        .expect("medley feedback should be updated");
-        let listed = WishlistItem::list_medley_feedback(&pool)
-            .await
-            .expect("medley feedback should be listed");
-        assert_eq!(
-            listed
-                .iter()
-                .find(|feedback| feedback.medley_id == medley_id)
-                .map(|feedback| feedback.category),
-            Some(WishlistCategory::NotFitMedley)
-        );
-
-        WishlistItem::set_medley_feedback(&pool, medley_id, member.id, None)
-            .await
-            .expect("medley feedback should be removed");
-        assert!(
-            !WishlistItem::list_medley_feedback(&pool)
-                .await
-                .expect("medley feedback should still be listable")
-                .iter()
-                .any(|feedback| feedback.medley_id == medley_id)
-        );
-        WishlistItem::set_medley_feedback(
-            &pool,
-            medley_id,
-            member.id,
-            Some(WishlistCategory::OtherOrdering),
-        )
-        .await
-        .expect("medley feedback should be reusable after removal");
-        WishlistItem::disband_medley(&pool, medley_id, member.id, false)
-            .await
-            .expect("creator should disband the medley");
-        assert!(
-            !WishlistItem::list_medley_feedback(&pool)
-                .await
-                .expect("medley feedback should be listed after disbanding")
-                .iter()
-                .any(|feedback| feedback.medley_id == medley_id)
-        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
