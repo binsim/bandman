@@ -28,13 +28,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 COPY --from=builder /app/target/release/bandman /app/bandman
-COPY --from=builder /app/target/release/hash.txt /app/hash.txt
 COPY --from=builder /app/target/site /app/site
 COPY migrations /app/migrations
 
 ENV LEPTOS_SITE_ROOT=site \
     LEPTOS_SITE_ADDR=0.0.0.0:3000 \
-    LEPTOS_HASH_FILES=true \
     RUST_LOG=info
 
 EXPOSE 3000
