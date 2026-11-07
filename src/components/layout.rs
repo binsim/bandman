@@ -83,16 +83,16 @@ fn Navigation(role: MemberRole, navigation_open: bool) -> impl IntoView {
 }
 #[component]
 fn LoginButton() -> impl IntoView {
-    if use_location().pathname.get() == "/login" {
-        return ().into_any();
-    }
+    let pathname = use_location().pathname;
 
     view! {
-        <div class="user-icon-container">
-            <A href="/login" attr:class="btn btn-primary btn-sm" attr:data-testid="login-btn">
-                {move || tr!("nav-login")}
-            </A>
-        </div>
+        <Show when=move || pathname.get() != "/login">
+            <div class="user-icon-container">
+                <A href="/login" attr:class="btn btn-primary btn-sm" attr:data-testid="login-btn">
+                    {move || tr!("nav-login")}
+                </A>
+            </div>
+        </Show>
     }
     .into_any()
 }
