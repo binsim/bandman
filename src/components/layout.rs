@@ -122,7 +122,6 @@ fn UserIcon(member: Member, menu_open: RwSignal<bool>, nav_open: RwSignal<bool>)
         <Show when=move || menu_open.get()>
             <div class="user-card" data-testid="user-card">
             // <section> Logged in as<br/> {member_name}</section>
-            <hr/>
             <section>
                 <LanguageSwitcher />
                 <ThemeToggle />
