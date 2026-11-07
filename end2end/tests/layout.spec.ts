@@ -62,6 +62,27 @@ test.describe("Admin user logged in", () => {
     }
   });
 
+  test("Mobile navigation and user menu are mutually exclusive", async ({
+    page,
+  }) => {
+    test.skip((page.viewportSize()?.width ?? 0) >= 700, "mobile-only behavior");
+
+    const navigation = page
+      .getByTestId(TOPBAR_NAVIGATION_CONTAINER)
+      .locator("nav ul");
+
+    await page.getByTestId("brand-name").click();
+    await expect(navigation).toBeVisible();
+
+    await page.getByTestId(USER_ICON).click();
+    await expect(page.getByTestId(USER_CARD)).toBeVisible();
+    await expect(navigation).toBeHidden();
+
+    await page.getByTestId("brand-name").click();
+    await expect(navigation).toBeVisible();
+    await expect(page.getByTestId(USER_CARD)).toBeHidden();
+  });
+
   test("Clicking user icon opens user card", async ({ page }) => {
     await page.getByTestId(USER_ICON).click();
 
@@ -70,6 +91,9 @@ test.describe("Admin user logged in", () => {
     await expect(page.getByTestId(THEME_TOGGLE)).toBeVisible();
 
     await expect(page.getByTestId(LOGOUT_BUTTON)).toBeVisible();
+
+    await page.locator("main").click({ position: { x: 10, y: 10 } });
+    await expect(page.getByTestId(USER_CARD)).toBeHidden();
   });
 });
 
