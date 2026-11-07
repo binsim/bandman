@@ -812,7 +812,7 @@ fn WishlistMedley(
             .first()
             .and_then(|item| item.medley_created_by_id)
     });
-    let can_manage =
+    let can_delete =
         current_member.role == MemberRole::Admin || medley_creator.get() == Some(current_member.id);
     let member_store = StoredValue::new(current_member);
     let medley_management_active = expect_context::<RwSignal<bool>>();
@@ -945,8 +945,9 @@ fn WishlistMedley(
                             //     is_medley=true
                             // />
                         // </Show>
-                        <Show when=move || !medley_management_active.get() && can_manage && !selecting_medley.get()>
+                        <Show when=move || !medley_management_active.get() && !selecting_medley.get()>
                             <WishlistMedleyActions
+                                can_delete
                                 name=medley_name
                                 pending=medley_pending
                                 confirming=confirm_disband
@@ -1082,6 +1083,7 @@ fn WishlistMedley(
 #[component]
 fn WishlistMedleyActions(
     name: Memo<String>,
+    can_delete: bool,
     pending: RwSignal<bool>,
     confirming: RwSignal<bool>,
     on_edit: Callback<()>,
@@ -1117,17 +1119,19 @@ fn WishlistMedleyActions(
                 >
                     {move || tr!("wishlist-medley-edit")}
                 </button>
-                <button
-                    class="btn btn-ghost btn-danger btn-sm"
-                    type="button"
-                    on:click=move |_| {
-                        menu_open.set(false);
-                        confirming.set(true);
-                    }
-                    disabled=move || pending.get()
-                >
-                    {move || tr!("wishlist-medley-disband")}
-                </button>
+                <Show when=move || can_delete>
+                    <button
+                        class="btn btn-ghost btn-danger btn-sm"
+                        type="button"
+                        on:click=move |_| {
+                            menu_open.set(false);
+                            confirming.set(true);
+                        }
+                        disabled=move || pending.get()
+                    >
+                        {move || tr!("wishlist-medley-disband")}
+                    </button>
+                </Show>
             </div>
             </Show>
         </div>
