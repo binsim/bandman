@@ -21,14 +21,14 @@ cargo leptos watch
 # Terminal 2 — Playwright
 cd end2end
 npm install
-npx playwright install chromium
+npx playwright install chromium webkit
 npx playwright test
 ```
 
 Or let cargo-leptos build the app, start it, and run the tests:
 
 ```bash
-cd end2end && npm install && npx playwright install chromium && cd ..
+cd end2end && npm install && npx playwright install chromium webkit && cd ..
 DATABASE_URL=******127.0.0.1:5432/bandman \
   SESSION_SECRET=dev \
   cargo leptos end-to-end
