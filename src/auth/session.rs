@@ -98,7 +98,7 @@ mod tests {
 
     #[test]
     fn sign_and_verify_roundtrip() {
-        std::env::set_var("SESSION_SECRET", "unit-test-secret");
+        unsafe { std::env::set_var("SESSION_SECRET", "unit-test-secret") };
         let id = Uuid::new_v4();
         let signed = sign_member_id(id);
         assert_eq!(verify_session_value(&signed), Some(id));
@@ -106,7 +106,7 @@ mod tests {
 
     #[test]
     fn rejects_tampered_signature() {
-        std::env::set_var("SESSION_SECRET", "unit-test-secret");
+        unsafe { std::env::set_var("SESSION_SECRET", "unit-test-secret") };
         let id = Uuid::new_v4();
         let signed = sign_member_id(id);
         let (signed_id, signature) = signed.split_once('.').unwrap();
@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     fn rejects_garbage() {
-        std::env::set_var("SESSION_SECRET", "unit-test-secret");
+        unsafe { std::env::set_var("SESSION_SECRET", "unit-test-secret") };
         assert_eq!(verify_session_value("not-a-session"), None);
     }
 }

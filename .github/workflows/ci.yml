@@ -155,7 +155,7 @@ jobs:
         working-directory: end2end
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium webkit
 
       - name: Build app
         run: cargo leptos build

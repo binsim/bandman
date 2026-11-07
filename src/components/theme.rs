@@ -47,10 +47,10 @@ pub fn provide_theme() -> ThemeCtx {
         let current = theme.get();
         #[cfg(feature = "hydrate")]
         {
-            if let Some(window) = web_sys::window() {
-                if let Ok(Some(storage)) = window.local_storage() {
-                    let _ = storage.set_item(STORAGE_KEY, current.as_str());
-                }
+            if let Some(window) = web_sys::window()
+                && let Ok(Some(storage)) = window.local_storage()
+            {
+                let _ = storage.set_item(STORAGE_KEY, current.as_str());
             }
         }
         let _ = current;
@@ -63,15 +63,15 @@ fn initial_theme() -> Theme {
     #[cfg(feature = "hydrate")]
     {
         if let Some(window) = web_sys::window() {
-            if let Ok(Some(storage)) = window.local_storage() {
-                if let Ok(Some(value)) = storage.get_item(STORAGE_KEY) {
-                    return Theme::parse(&value);
-                }
+            if let Ok(Some(storage)) = window.local_storage()
+                && let Ok(Some(value)) = storage.get_item(STORAGE_KEY)
+            {
+                return Theme::parse(&value);
             }
-            if let Ok(Some(mql)) = window.match_media("(prefers-color-scheme: dark)") {
-                if mql.matches() {
-                    return Theme::Dark;
-                }
+            if let Ok(Some(mql)) = window.match_media("(prefers-color-scheme: dark)")
+                && mql.matches()
+            {
+                return Theme::Dark;
             }
         }
     }

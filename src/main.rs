@@ -2,12 +2,12 @@
 #[tokio::main]
 async fn main() {
     use axum::Router;
-    use bandman::app::{shell, App};
+    use bandman::app::{App, shell};
     use bandman::db::connect_and_migrate;
     use bandman::state::AppState;
     use leptos::logging::log;
     use leptos::prelude::*;
-    use leptos_axum::{generate_route_list, LeptosRoutes};
+    use leptos_axum::{LeptosRoutes, generate_route_list};
 
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()

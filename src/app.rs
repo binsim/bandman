@@ -1,15 +1,15 @@
 use crate::components::layout::AppShell;
-use crate::components::theme::{provide_theme, ThemeRoot};
+use crate::components::theme::{ThemeRoot, provide_theme};
 use crate::pages::{
     admin::AdminPage, finance::FinancePage, login::LoginPage, plan::PlanPage, program::ProgramPage,
     wishlist::WishlistPage,
 };
 use leptos::prelude::*;
-use leptos_fluent::{leptos_fluent, I18n};
-use leptos_meta::{provide_meta_context, MetaTags, Title};
+use leptos_fluent::{I18n, leptos_fluent};
+use leptos_meta::{MetaTags, Title, provide_meta_context};
 use leptos_router::{
-    components::{Route, Router, Routes},
     StaticSegment,
+    components::{Route, Router, Routes},
 };
 
 pub fn shell(options: LeptosOptions) -> impl IntoView {

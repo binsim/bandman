@@ -1,7 +1,7 @@
 //! Database pool and migration helpers (SSR only).
 
-use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
+use sqlx::postgres::PgPoolOptions;
 use std::time::Duration;
 
 /// Shared Postgres connection pool.

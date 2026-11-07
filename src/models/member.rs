@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
-use sqlx::{postgres::PgRow, FromRow, PgPool, Row};
+use sqlx::{FromRow, PgPool, Row, postgres::PgRow};
 use std::str::FromStr;
 use uuid::Uuid;
 
@@ -416,10 +416,12 @@ mod tests {
         Member::delete(&pool, member.id)
             .await
             .expect("member should be deleted");
-        assert!(Member::find_by_id(&pool, member.id)
-            .await
-            .expect("member query should succeed")
-            .is_none());
+        assert!(
+            Member::find_by_id(&pool, member.id)
+                .await
+                .expect("member query should succeed")
+                .is_none()
+        );
 
         let mut seeded_admin = Member::find_active_by_name(&pool, "Admin")
             .await
@@ -525,14 +527,18 @@ mod tests {
             .update_details(&pool, &name, MemberRole::Participant, false)
             .await
             .expect("member should deactivate");
-        assert!(Member::find_active_by_id(&pool, member.id)
-            .await
-            .expect("active member lookup should succeed")
-            .is_none());
-        assert!(Member::find_active_by_name(&pool, &name)
-            .await
-            .expect("active name lookup should succeed")
-            .is_none());
+        assert!(
+            Member::find_active_by_id(&pool, member.id)
+                .await
+                .expect("active member lookup should succeed")
+                .is_none()
+        );
+        assert!(
+            Member::find_active_by_name(&pool, &name)
+                .await
+                .expect("active name lookup should succeed")
+                .is_none()
+        );
         assert!(
             !Member::find_by_id(&pool, member.id)
                 .await
@@ -540,16 +546,20 @@ mod tests {
                 .expect("inactive member should remain queryable")
                 .active
         );
-        assert!(Member::list_active(&pool)
-            .await
-            .expect("active member list should succeed")
-            .iter()
-            .all(|listed| listed.id != member.id));
-        assert!(Member::list_all(&pool)
-            .await
-            .expect("all member list should succeed")
-            .iter()
-            .any(|listed| listed.id == member.id && !listed.active));
+        assert!(
+            Member::list_active(&pool)
+                .await
+                .expect("active member list should succeed")
+                .iter()
+                .all(|listed| listed.id != member.id)
+        );
+        assert!(
+            Member::list_all(&pool)
+                .await
+                .expect("all member list should succeed")
+                .iter()
+                .any(|listed| listed.id == member.id && !listed.active)
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
@@ -579,9 +589,11 @@ mod tests {
             .await
             .expect("one of multiple admins should be deletable");
 
-        assert!(Member::find_active_by_name(&pool, "Admin")
-            .await
-            .expect("seeded admin lookup should succeed")
-            .is_some());
+        assert!(
+            Member::find_active_by_name(&pool, "Admin")
+                .await
+                .expect("seeded admin lookup should succeed")
+                .is_some()
+        );
     }
 }
