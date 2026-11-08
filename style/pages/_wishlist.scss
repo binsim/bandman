@@ -475,6 +475,11 @@
   background: rgb(0 0 0 / 0.35);
 }
 
+.wishlist-edit-form {
+  position: relative;
+  z-index: 31;
+}
+
 .wishlist-edit-actions {
   display: flex;
   align-items: center;
