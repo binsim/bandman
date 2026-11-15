@@ -8,6 +8,12 @@ import {
 import { ADMIN_FILE, MEMBER_FILE, PARTICIPANT_FILE } from "./helpers";
 
 const WISHLIST_DUPLICATE_WARNING_ERROR = "wishlist-duplicate-warning";
+const testRunId = Date.now();
+const heavyCrossTitle = `Heavy Cross ${testRunId}`;
+const medleySong1 = `Medley Song 1 ${testRunId}`;
+const medleySong2 = `Medley Song 2 ${testRunId}`;
+const medleySong3 = `Medley Song 3 ${testRunId}`;
+const testMedleyName = `Test Medley ${testRunId}`;
 
 test.describe("No user logged in", () => {
   test.beforeEach(async ({ page }) => {
@@ -48,23 +54,46 @@ test.describe("Wishlist", () => {
       form: songInfo,
     });
     if (!response.ok()) {
-      throw new Error(`Could not create song: ${JSON.stringify(songInfo)}`);
+      throw new Error(
+        `Could not create song: ${JSON.stringify(songInfo)} due to ${await response.text()}`,
+      );
     }
 
     createdSongs.push(await response.json());
   }
 
-  async function getSongRow(page: Page, songTitle: string): Promise<Locator> {
-    return page.locator(`[data-song-name="${songTitle}"]`);
+  function getSongRow(page: Page, songTitle: string): Locator {
+    return page.locator(`[data-song-name="${songTitle}"]`).locator("xpath=..");
   }
 
   test.beforeAll(async ({ request }) => {
     await createSong(request, {
-      title: "Heavy Cross",
+      title: heavyCrossTitle,
       artist: "Gossip",
       link: "https://www.youtube.com/watch?v=tjc36rR4Mq0",
       tempo: "120",
       musical_key: "C major",
+    });
+    await createSong(request, {
+      title: medleySong1,
+      artist: "",
+      link: "",
+      tempo: "",
+      musical_key: "",
+    });
+    await createSong(request, {
+      title: medleySong2,
+      artist: "",
+      link: "",
+      tempo: "",
+      musical_key: "",
+    });
+    await createSong(request, {
+      title: medleySong3,
+      artist: "",
+      link: "",
+      tempo: "",
+      musical_key: "",
     });
   });
   test.afterAll(async ({ request }) => {
@@ -120,7 +149,7 @@ test.describe("Wishlist", () => {
     });
 
     test("Add song shows warning for same title", async ({ page }) => {
-      await titleInput.fill("Heavy Cross");
+      await titleInput.fill(heavyCrossTitle);
       await expect(
         page.getByTestId(WISHLIST_DUPLICATE_WARNING_ERROR),
       ).toBeVisible();
@@ -130,7 +159,7 @@ test.describe("Wishlist", () => {
     test("Add song disabeled when song already in wishlist", async ({
       page,
     }) => {
-      await titleInput.fill("Heavy Cross");
+      await titleInput.fill(heavyCrossTitle);
       await artistInput.fill("Gossip");
       await expect(
         page.getByTestId(WISHLIST_DUPLICATE_WARNING_ERROR),
@@ -143,7 +172,7 @@ test.describe("Wishlist", () => {
       await artistInput.fill("TestInterpret");
       await addSongButton.click();
 
-      const songline = await getSongRow(page, "TestSong");
+      const songline = getSongRow(page, "TestSong");
 
       // Delete it again
       await songline.getByTestId("wishlist-edit").click();
@@ -152,10 +181,10 @@ test.describe("Wishlist", () => {
     });
 
     test("Wishlist item is well formatted", async ({ page }) => {
-      const line = await getSongRow(page, "Heavy Cross");
+      const line = getSongRow(page, heavyCrossTitle);
 
       await expect(
-        line.getByRole("heading", { name: "Heavy Cross" }),
+        line.getByRole("heading", { name: heavyCrossTitle }),
       ).toBeVisible();
       await expect(line.getByText("Gossip")).toBeVisible();
       await expect(line.getByText("⁨120⁩ BPM")).toBeVisible();
@@ -171,7 +200,7 @@ test.describe("Wishlist", () => {
     });
 
     test("Adding feedback is possible", async ({ page }) => {
-      const line = await getSongRow(page, "Heavy Cross");
+      const line = getSongRow(page, heavyCrossTitle);
       await line.getByTestId("wishliste-feedback-edit").click();
 
       const feedbackForm = line.getByTestId("wishlist-feedback-popup");
@@ -203,7 +232,7 @@ test.describe("Wishlist", () => {
       await titleInput.fill("Dummy Title");
       await addSongButton.click();
 
-      const songLine = await getSongRow(page, "Dummy Title");
+      const songLine = getSongRow(page, "Dummy Title");
       const editButton = songLine.getByTestId("wishlist-edit");
       await editButton.click();
 
@@ -258,6 +287,118 @@ test.describe("Wishlist", () => {
       await popupDeleteButton.click();
 
       expect(songLine).toBeHidden();
+    });
+
+    test("adding songs to medley is possible", async ({ page }) => {
+      const createMedleyButton = page.getByTestId("wishlist-create-medley");
+
+      await expect(createMedleyButton).toBeVisible();
+      await createMedleyButton.click();
+
+      const createMedleyForm = page.getByTestId("wishlist-medley-create-form");
+      await expect(createMedleyForm).toBeVisible();
+      const medleyNameInput = createMedleyForm.getByTestId("medley-name-input");
+      const saveMedleyButton = createMedleyForm.getByTestId("save-medley");
+      const cancelMedleyButton = createMedleyForm.getByTestId("cancel-medley");
+      await expect(medleyNameInput).toBeVisible();
+      await expect(saveMedleyButton).toBeDisabled();
+      await expect(cancelMedleyButton).toBeEnabled();
+
+      await getSongRow(page, medleySong1)
+        .getByTestId("song-added-to-medley-cb")
+        .setChecked(true);
+      await getSongRow(page, medleySong2)
+        .getByTestId("song-added-to-medley-cb")
+        .setChecked(true);
+      await expect(saveMedleyButton).toBeDisabled();
+      await medleyNameInput.fill(testMedleyName);
+      await expect(saveMedleyButton).toBeEnabled();
+
+      await getSongRow(page, medleySong3)
+        .getByTestId("song-added-to-medley-cb")
+        .setChecked(true);
+
+      await saveMedleyButton.click();
+      const medleyLine = page.locator(`[data-medley-name="${testMedleyName}"]`);
+      expect(medleyLine).toBeVisible();
+    });
+
+    test("modifying medley is possible", async ({ page }) => {
+      const medleyLine = page.locator(`[data-medley-name="${testMedleyName}"]`);
+      const medleyManageButton = medleyLine.getByTestId("medley-manage-button");
+      const medleyEditButton = medleyLine.getByTestId("medley-edit-button");
+      const medleyDeleteButton = medleyLine.getByTestId("medley-delete-button");
+      const medleySaveButton = medleyLine.getByTestId("medley-save-button");
+      const medleyCancelButton = medleyLine.getByTestId("medley-cancel-button");
+
+      await expect(medleyManageButton).toBeVisible();
+      await medleyManageButton.click();
+
+      await expect(medleyEditButton).toBeVisible();
+      await expect(medleyDeleteButton).toBeVisible();
+
+      await medleyEditButton.click();
+      const medleyNameInput = medleyLine.getByTestId("medley-name-edit");
+      await expect(medleyNameInput).toBeVisible();
+      await expect(medleySaveButton).toBeVisible();
+      await expect(medleyCancelButton).toBeVisible();
+
+      await medleyNameInput.fill("Another Name");
+      await medleyCancelButton.click();
+
+      await medleyManageButton.click();
+      await medleyEditButton.click();
+
+      const editRows = medleyLine.locator(".wishlist-medley-edit-row h3");
+      await expect(editRows).toHaveText([
+        medleySong1,
+        medleySong2,
+        medleySong3,
+      ]);
+
+      const firstSong = getSongRow(page, medleySong1);
+      const secondSong = getSongRow(page, medleySong2);
+      const thirdSong = getSongRow(page, medleySong3);
+      await expect(
+        firstSong.getByTestId("medley-move-song-up-button"),
+      ).toBeDisabled();
+      await expect(
+        thirdSong.getByTestId("medley-move-song-down-button"),
+      ).toBeDisabled();
+
+      await secondSong.getByTestId("medley-move-song-up-button").click();
+      await expect(editRows).toHaveText([
+        medleySong2,
+        medleySong1,
+        medleySong3,
+      ]);
+      await secondSong.getByTestId("medley-move-song-down-button").click();
+      await expect(editRows).toHaveText([
+        medleySong1,
+        medleySong2,
+        medleySong3,
+      ]);
+
+      await thirdSong.getByTestId("song-added-to-medley-cb").click();
+      await expect(editRows).toHaveText([medleySong1, medleySong2]);
+      await medleySaveButton.click();
+      await expect(
+        medleyLine.locator(".wishlist-medley-songs [data-song-name]"),
+      ).toHaveCount(2);
+      await expect(
+        medleyLine.locator(`[data-song-name="${medleySong3}"]`),
+      ).toHaveCount(0);
+      await expect(getSongRow(page, medleySong3)).toBeVisible();
+
+      await medleyManageButton.click();
+      await medleyDeleteButton.click();
+      const deleteDialog = medleyLine.getByRole("dialog");
+      await expect(deleteDialog).toBeVisible();
+      await deleteDialog.getByTestId("medley-confirm-delete-button").click();
+      await expect(medleyLine).toHaveCount(0);
+      await expect(getSongRow(page, medleySong1)).toBeVisible();
+      await expect(getSongRow(page, medleySong2)).toBeVisible();
+      await expect(getSongRow(page, medleySong3)).toBeVisible();
     });
   });
 
