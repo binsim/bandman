@@ -25,7 +25,7 @@ test.describe("No user logged in", () => {
     await expect(
       page
         .getByRole("main")
-        .getByRole("link", { name: /^(Anmelden|Sign In)$/i }),
+        .getByRole("link", { name: /^(Anmelden|Log in)$/i }),
     ).toBeVisible();
   });
 });
