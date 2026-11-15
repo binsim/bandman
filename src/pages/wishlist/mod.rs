@@ -7,7 +7,7 @@ use crate::{
     },
     pages::wishlist::modify_song::EditSong,
 };
-use leptos::prelude::*;
+use leptos::{ev, prelude::*};
 use leptos_fluent::tr;
 
 use crate::pages::wishlist::wishlist_feedback_form::WishlistFeedbackControl;
@@ -1104,8 +1104,15 @@ fn WishlistMedleyActions(
     on_confirm_disband: Callback<()>,
 ) -> AnyView {
     let menu_open = RwSignal::new(false);
+    let pointer_listener =
+        window_event_listener(ev::pointerdown, move |_| menu_open.set(false));
+    on_cleanup(move || pointer_listener.remove());
     view! {
-        <div class="wishlist-medley-menu">
+        <div
+            class="wishlist-medley-menu"
+            on:pointerdown=|ev| ev.stop_propagation()
+            on:click=|ev| ev.stop_propagation()
+        >
             <button
                 class="btn btn-ghost btn-sm"
                 type="button"

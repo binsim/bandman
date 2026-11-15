@@ -337,6 +337,16 @@ test.describe("Wishlist", () => {
       await expect(medleyEditButton).toBeVisible();
       await expect(medleyDeleteButton).toBeVisible();
 
+      const outsideTarget = page.locator("#wishlist-list-title");
+      if (test.info().project.name === "mobile") {
+        await outsideTarget.tap();
+      } else {
+        await outsideTarget.click();
+      }
+      await expect(medleyEditButton).toBeHidden();
+      await expect(medleyDeleteButton).toBeHidden();
+
+      await medleyManageButton.click();
       await medleyEditButton.click();
       const medleyNameInput = medleyLine.getByTestId("medley-name-edit");
       await expect(medleyNameInput).toBeVisible();
