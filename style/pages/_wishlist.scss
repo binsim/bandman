@@ -39,7 +39,7 @@
     flex-wrap: wrap;
     align-items: center;
     gap: var(--space-3);
-    padding: .2rem 0;
+    padding: 0.2rem 0;
   }
 }
 
@@ -278,7 +278,6 @@
   flex: 0 0 auto;
 }
 
-
 @media (max-width: 640px) {
   .wishlist-medley-controls.is-selecting {
     align-items: stretch;
@@ -345,82 +344,82 @@
 }
 
 .wishlist-song-summary {
-    > div {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-2) var(--space-3);
-      min-width: 0;
-      flex: 1 1 auto;
+  > div {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-3);
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  h3 {
+    min-width: 0;
+    max-width: 100%;
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.9rem;
+  }
+
+  .wishlist-artist {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text-muted);
+    font-size: 0.9rem;
+
+    &::before {
+      content: "—";
+      margin-right: var(--space-2);
+      color: var(--color-border);
     }
+  }
 
-    h3 {
-     min-width: 0;
-     max-width: 100%;
-     margin: 0;
-     overflow: hidden;
-     text-overflow: ellipsis;
-     white-space: nowrap;
-     font-size: .9rem;
-   }
+  .wishlist-badge {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.15rem 0.55rem;
+    border-radius: 999px;
+    background: var(--color-accent-soft);
+    color: var(--color-text-muted);
+    font-size: 0.8rem;
+  }
 
-   .wishlist-artist {
-     flex: 0 1 auto;
-     min-width: 0;
-     overflow: hidden;
-     text-overflow: ellipsis;
-     white-space: nowrap;
-     color: var(--color-text-muted);
-     font-size: 0.9rem;
-
-     &::before {
-       content: "—";
-       margin-right: var(--space-2);
-       color: var(--color-border);
-     }
-   }
-
-   .wishlist-badge {
-     flex: 0 1 auto;
-     min-width: 0;
-     max-width: 18rem;
-     overflow: hidden;
-     text-overflow: ellipsis;
-     white-space: nowrap;
-     display: inline-flex;
-     align-items: center;
-     padding: 0.15rem 0.55rem;
-     border-radius: 999px;
-     background: var(--color-accent-soft);
-     color: var(--color-text-muted);
-     font-size: 0.8rem;
-   }
-
-   .wishlist-link {
-     color: var(--color-accent);
-   }
+  .wishlist-link {
+    color: var(--color-accent);
+  }
 }
 
 @media (max-width: 700px) {
-    .wishlist-song-summary {
-        max-width: 40%;
-        > div {
-            flex-direction: column;
-        }
-
-        .wishlist-artist {
-            margin-top: calc(var(--space-2) * -1);
-
-            &::before {
-                content: "";
-                margin-right: 0;
-            }
-        }
+  .wishlist-song-summary {
+    max-width: 40%;
+    > div {
+      flex-direction: column;
     }
 
-    .wishlist-item-actions {
-        flex-direction: column;
-        align-items: end;
+    .wishlist-artist {
+      margin-top: calc(var(--space-2) * -1);
+
+      &::before {
+        content: "";
+        margin-right: 0;
+      }
     }
+  }
+
+  .wishlist-item-actions {
+    flex-direction: column;
+    align-items: end;
+  }
 }
 
 .wishlist-music-detail {
