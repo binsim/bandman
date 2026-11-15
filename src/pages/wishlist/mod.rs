@@ -1179,6 +1179,7 @@ fn WishlistMedleyActions(
                                 type="button"
                                 on:click=move |_| confirming.set(false)
                                 disabled=move || pending.get()
+                                data-testid="medley-cancel-delete-button"
                             >
                                 {move || tr!("admin-cancel")}
                             </button>

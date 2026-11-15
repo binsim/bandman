@@ -320,7 +320,7 @@ test.describe("Wishlist", () => {
 
       await saveMedleyButton.click();
       const medleyLine = page.locator(`[data-medley-name="${testMedleyName}"]`);
-      expect(medleyLine).toBeVisible();
+      await expect(medleyLine).toBeVisible();
     });
 
     test("modifying medley is possible", async ({ page }) => {
@@ -382,19 +382,23 @@ test.describe("Wishlist", () => {
         medleySong1,
         medleySong3,
       ]);
-      await secondSong.getByTestId("medley-move-song-down-button").click();
+      await firstSong.getByTestId("medley-move-song-down-button").click();
       await expect(editRows).toHaveText([
-        medleySong1,
         medleySong2,
         medleySong3,
+        medleySong1,
       ]);
 
       await thirdSong.getByTestId("song-added-to-medley-cb").click();
-      await expect(editRows).toHaveText([medleySong1, medleySong2]);
+      await expect(editRows).toHaveText([medleySong2, medleySong1]);
       await medleySaveButton.click();
       await expect(
         medleyLine.locator(".wishlist-medley-songs [data-song-name]"),
       ).toHaveCount(2);
+      await expect(medleyLine.locator(".wishlist-medley-songs h3")).toHaveText([
+        medleySong2,
+        medleySong1,
+      ]);
       await expect(
         medleyLine.locator(`[data-song-name="${medleySong3}"]`),
       ).toHaveCount(0);
@@ -403,6 +407,16 @@ test.describe("Wishlist", () => {
       await medleyManageButton.click();
       await medleyDeleteButton.click();
       const deleteDialog = medleyLine.getByRole("dialog");
+      await expect(deleteDialog).toBeVisible();
+      await deleteDialog.getByTestId("medley-cancel-delete-button").click();
+      await expect(deleteDialog).toBeHidden();
+      await expect(medleyLine).toBeVisible();
+      await expect(
+        medleyLine.locator(".wishlist-medley-songs [data-song-name]"),
+      ).toHaveCount(2);
+
+      await medleyManageButton.click();
+      await medleyDeleteButton.click();
       await expect(deleteDialog).toBeVisible();
       await deleteDialog.getByTestId("medley-confirm-delete-button").click();
       await expect(medleyLine).toHaveCount(0);
