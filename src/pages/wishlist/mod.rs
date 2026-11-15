@@ -501,6 +501,7 @@ fn WishlistListing(
                             type="button"
                             aria-pressed=move || show_needs_feedback.get().to_string()
                             on:click=move |_| on_filter_changed.run(true)
+                            data-testid="filter-feedback-needed"
                         >
                             {move || tr!("wishlist-filter-needs-feedback")}
                         </button>
@@ -510,6 +511,7 @@ fn WishlistListing(
                             type="button"
                             aria-pressed=move || (!show_needs_feedback.get()).to_string()
                             on:click=move |_| on_filter_changed.run(false)
+                            data-testid="filter-all-songs"
                         >
                             {move || tr!("wishlist-filter-all")}
                         </button>
@@ -1311,6 +1313,7 @@ fn WishlistRow(
                 !item.get().feedback.iter().any(|feedback| feedback.member_id == member_id)
             }
             data-testid="wishlist-item"
+            data-song-name=move || item.get().title
         >
             <div class="wishlist-item-line">
                 <div class="wishlist-song-summary">

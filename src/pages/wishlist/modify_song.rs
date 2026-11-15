@@ -240,7 +240,7 @@ pub fn EditSong(
             {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
         </button>
         <Show when= move || editing.get()>
-            <PopupModal clone:current_member>
+            <PopupModal clone:current_member data_testid="edit-song-form">
                 <EditSongForm edit_pending editing confirm_delete item current_member=current_member.clone() on_updated />
             </PopupModal>
         </Show>
@@ -392,7 +392,7 @@ pub fn DeleteConfirmationForm(
     };
 
     view! {
-        <div class="admin-delete-backdrop">
+        <div class="admin-delete-backdrop" data-testid="delete-confirmation-popup">
             <section
                 class="admin-delete-dialog"
                 role="dialog"

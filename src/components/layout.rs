@@ -8,9 +8,12 @@ use leptos_router::components::A;
 use leptos_router::hooks::use_location;
 
 #[component]
-pub fn PopupModal(children: Children) -> impl IntoView {
+pub fn PopupModal(
+    #[prop(optional, into)] data_testid: Option<String>,
+    children: Children,
+) -> impl IntoView {
     view! {
-        <div class="popup-modal">
+        <div class="popup-modal" data-testid=data_testid>
             {children()}
         </div>
     }
