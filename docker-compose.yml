@@ -2,26 +2,45 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: bandman
-      POSTGRES_PASSWORD: bandman
-      POSTGRES_DB: bandman
+      POSTGRES_USER: ${POSTGRES_USER:-bandman}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bandman}
+      POSTGRES_DB: ${POSTGRES_DB:-bandman}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - bandman_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bandman -d bandman"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bandman} -d ${POSTGRES_DB:-bandman}"]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    profiles: ["dev"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@bandman.dev}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-bandman}
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+      PGPASS_FILE: /pgadmin4/pgpass
+    ports:
+      - "5050:80"
+    configs:
+      - source: pgadmin_servers
+        target: /pgadmin4/servers.json
+      - source: pgadmin_pgpass
+        target: /pgadmin4/pgpass
+    depends_on:
+      db:
+        condition: service_healthy
 
   app:
     image: ghcr.io/binsim/bandman:latest
     ports:
       - "3000:3000"
     environment:
-      DATABASE_URL: postgres://bandman:bandman@db:5432/bandman
-      SESSION_SECRET: change-me-in-production
+      DATABASE_URL: postgres://${POSTGRES_USER:-bandman}:${POSTGRES_PASSWORD:-bandman}@db:5432/${POSTGRES_DB:-bandman}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET before publishing}
       LEPTOS_SITE_ADDR: 0.0.0.0:3000
       LEPTOS_SITE_ROOT: site
       RUST_LOG: info
@@ -34,3 +53,22 @@ services:
 volumes:
   bandman_pg:
   bandman_uploads:
+
+configs:
+  pgadmin_servers:
+    content: |
+      {
+        "Servers": {
+          "1": {
+            "Name": "Bandman",
+            "Group": "Servers",
+            "Host": "db",
+            "Port": 5432,
+            "MaintenanceDB": "${POSTGRES_DB:-bandman}",
+            "Username": "${POSTGRES_USER:-bandman}",
+            "SSLMode": "prefer"
+          }
+        }
+      }
+  pgadmin_pgpass:
+    content: "db:5432:${POSTGRES_DB:-bandman}:${POSTGRES_USER:-bandman}:${POSTGRES_PASSWORD:-bandman}\n"
