@@ -240,7 +240,7 @@ pub fn EditSong(
             {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
         </button>
         <Show when= move || editing.get()>
-            <PopupModal clone:current_member>
+            <PopupModal clone:current_member data_testid="edit-song-form">
                 <EditSongForm edit_pending editing confirm_delete item current_member=current_member.clone() on_updated />
             </PopupModal>
         </Show>
@@ -298,8 +298,17 @@ pub fn EditSongForm(
                     link.set(updated.link.clone().unwrap_or_default());
                     tempo.set(updated.tempo.map(|i| i.to_string()).unwrap_or_default());
                     musical_key.set(updated.musical_key.clone().unwrap_or_default());
+                    item.update(|item| {
+                        item.title = updated.title.clone();
+                        item.artist = updated.artist.clone();
+                        item.link = updated.link.clone();
+                        item.link_title = updated.link_title.clone();
+                        item.tempo = updated.tempo;
+                        item.musical_key = updated.musical_key.clone();
+                    });
                     on_updated.run(updated);
                     edit_pending.set(false);
+                    editing.set(false);
                 }
                 Err(message) => error.set(Some(message.to_string())),
             }
@@ -392,7 +401,7 @@ pub fn DeleteConfirmationForm(
     };
 
     view! {
-        <div class="admin-delete-backdrop">
+        <div class="admin-delete-backdrop" data-testid="delete-confirmation-popup">
             <section
                 class="admin-delete-dialog"
                 role="dialog"

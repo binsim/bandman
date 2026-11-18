@@ -7,7 +7,7 @@ use crate::{
     },
     pages::wishlist::modify_song::EditSong,
 };
-use leptos::prelude::*;
+use leptos::{ev, prelude::*};
 use leptos_fluent::tr;
 
 use crate::pages::wishlist::wishlist_feedback_form::WishlistFeedbackControl;
@@ -485,6 +485,7 @@ fn WishlistListing(
                             class="btn btn-primary btn-sm"
                             type="button"
                             on:click=move |_| on_start_creating_medley.run(())
+                            data-testid="wishlist-create-medley"
                         >
                             {move || tr!("wishlist-medley-start")}
                         </button>
@@ -501,6 +502,7 @@ fn WishlistListing(
                             type="button"
                             aria-pressed=move || show_needs_feedback.get().to_string()
                             on:click=move |_| on_filter_changed.run(true)
+                            data-testid="filter-feedback-needed"
                         >
                             {move || tr!("wishlist-filter-needs-feedback")}
                         </button>
@@ -510,6 +512,7 @@ fn WishlistListing(
                             type="button"
                             aria-pressed=move || (!show_needs_feedback.get()).to_string()
                             on:click=move |_| on_filter_changed.run(false)
+                            data-testid="filter-all-songs"
                         >
                             {move || tr!("wishlist-filter-all")}
                         </button>
@@ -569,7 +572,7 @@ fn WishlistMedleyControls(
     let medley_management_active = expect_context::<RwSignal<bool>>();
     view! {
         <Show when=move || selecting_medley.get()>
-            <div class="wishlist-medley-controls">
+            <div class="wishlist-medley-controls" data-testid="wishlist-medley-create-form">
                 <div class="wishlist-medley-selection-actions">
                     <span class="muted">
                         {move || tr!("wishlist-medley-selected", {"count" => selected_songs.get().len().to_string()})}
@@ -583,6 +586,7 @@ fn WishlistMedleyControls(
                         prop:value=move || new_medley_name.get()
                         on:input=move |event| new_medley_name.set(event_target_value(&event))
                         disabled=move || medley_pending.get()
+                        data-testid="medley-name-input"
                     />
                 </div>
                 <Show when=move || selected_songs.get().len() < 2 >
@@ -596,6 +600,7 @@ fn WishlistMedleyControls(
                         type="button"
                         on:click=move |_| on_create_medley.run(())
                         disabled=move || medley_pending.get() || selected_songs.get().len() < 2 || new_medley_name.get().trim().is_empty()
+                        data-testid="save-medley"
                     >
                         {move || if medley_pending.get() { tr!("wishlist-medley-saving") } else { tr!("wishlist-medley-create") }}
                     </button>
@@ -610,6 +615,7 @@ fn WishlistMedleyControls(
                             medley_error.set(None);
                         }
                         disabled=move || medley_pending.get()
+                        data-testid="cancel-medley"
                     >
                         {move || tr!("admin-cancel")}
                     </button>
@@ -913,6 +919,7 @@ fn WishlistMedley(
             class="wishlist-medley"
             class:is-expanded=move || expanded.get()
             data-testid="wishlist-medley"
+            data-medley-name=move || medley_name
         >
             <header class="collapsable">
                 <div style="display: flex; align-items:center; gap: var(--space-2) var(--space-3);width:100%">
@@ -926,6 +933,7 @@ fn WishlistMedley(
                             tr!("wishlist-medley-expand")
                         }
                         on:click=move |_| expanded.update(|expanded| *expanded = !*expanded)
+                        data-testid="medley-expand-button"
                     >
                         <span aria-hidden="true">{move || if expanded.get() { "▾" } else { "▸" }}</span>
                     </button>
@@ -982,6 +990,7 @@ fn WishlistMedley(
                             prop:value=move || edit_name.get()
                             on:input=move |event| edit_name.set(event_target_value(&event))
                             disabled=move || rename_pending.get()
+                            data-testid="medley-name-edit"
                         />
                     </header>
                     <p class="muted">{move || tr!("wishlist-medley-edit-hint")}</p>
@@ -1000,6 +1009,7 @@ fn WishlistMedley(
                                                 prop:checked=true
                                                 on:change=move |_| edit_song_ids.update(|ids| ids.retain(|id| *id != song_id))
                                                 disabled=move || rename_pending.get()
+                                                data-testid="song-added-to-medley-cb"
                                             />
                                         </label>
                                         <div class="wishlist-medley-order-controls">
@@ -1009,6 +1019,7 @@ fn WishlistMedley(
                                                 aria-label=move || tr!("wishlist-medley-move-up")
                                                 on:click=move |_| edit_song_ids.update(|ids| move_song(ids, song_id, -1))
                                                 disabled=move || rename_pending.get() || edit_song_ids.get().first() == Some(&song_id)
+                                                data-testid="medley-move-song-up-button"
                                             >"↑"</button>
                                             <button
                                                 class="btn btn-ghost btn-sm"
@@ -1016,6 +1027,7 @@ fn WishlistMedley(
                                                 aria-label=move || tr!("wishlist-medley-move-down")
                                                 on:click=move |_| edit_song_ids.update(|ids| move_song(ids, song_id, 1))
                                                 disabled=move || rename_pending.get() || edit_song_ids.get().last() == Some(&song_id)
+                                                data-testid="medley-move-song-down-button"
                                             >"↓"</button>
                                         </div>
                                         <WishlistRow
@@ -1036,6 +1048,7 @@ fn WishlistMedley(
                             type="button"
                             on:click=save_medley
                             disabled=move || rename_pending.get() || edit_name.get().trim().is_empty() || edit_song_ids.get().len() < 2
+                            data-testid="medley-save-button"
                         >
                             {move || if rename_pending.get() { tr!("wishlist-medley-saving-changes") } else { tr!("admin-save-changes") }}
                         </button>
@@ -1044,6 +1057,7 @@ fn WishlistMedley(
                             type="button"
                             on:click=move |_| cancel_editing.run(())
                             disabled=move || rename_pending.get()
+                            data-testid="medley-cancel-button"
                         >
                             {move || tr!("admin-cancel")}
                         </button>
@@ -1090,49 +1104,52 @@ fn WishlistMedleyActions(
     on_confirm_disband: Callback<()>,
 ) -> AnyView {
     let menu_open = RwSignal::new(false);
+    let pointer_listener = window_event_listener(ev::pointerdown, move |_| menu_open.set(false));
+    on_cleanup(move || pointer_listener.remove());
     view! {
-        <div class="wishlist-medley-menu">
+        <div
+            class="wishlist-medley-menu"
+            on:pointerdown=|ev| ev.stop_propagation()
+            on:click=|ev| ev.stop_propagation()
+        >
             <button
                 class="btn btn-ghost btn-sm"
                 type="button"
                 aria-expanded=move || menu_open.get().to_string()
                 on:click=move |_| menu_open.update(|open| *open = !*open)
+                data-testid="medley-manage-button"
             >
                 {move || tr!("wishlist-medley-actions")}
                 <span class="wishlist-medley-menu-arrow" aria-hidden="true">"▾"</span>
             </button>
             <Show when=move || menu_open.get()>
-                <button
-                    class="wishlist-medley-menu-backdrop"
-                    type="button"
-                    aria-label=move || tr!("admin-cancel")
-                    on:click=move |_| menu_open.set(false)
-                ></button>
-            <div class="wishlist-medley-menu-items">
-                <button
-                    class="btn btn-ghost btn-sm"
-                    type="button"
-                    on:click=move |_| {
-                        menu_open.set(false);
-                        on_edit.run(());
-                    }
-                >
-                    {move || tr!("wishlist-medley-edit")}
-                </button>
-                <Show when=move || can_delete>
+                <div class="wishlist-medley-menu-items">
                     <button
-                        class="btn btn-ghost btn-danger btn-sm"
+                        class="btn btn-ghost btn-sm"
                         type="button"
                         on:click=move |_| {
                             menu_open.set(false);
-                            confirming.set(true);
+                            on_edit.run(());
                         }
-                        disabled=move || pending.get()
+                        data-testid="medley-edit-button"
                     >
-                        {move || tr!("wishlist-medley-disband")}
+                        {move || tr!("wishlist-medley-edit")}
                     </button>
-                </Show>
-            </div>
+                    <Show when=move || can_delete>
+                        <button
+                            class="btn btn-ghost btn-danger btn-sm"
+                            type="button"
+                            on:click=move |_| {
+                                menu_open.set(false);
+                                confirming.set(true);
+                            }
+                            disabled=move || pending.get()
+                            data-testid="medley-delete-button"
+                        >
+                            {move || tr!("wishlist-medley-disband")}
+                        </button>
+                    </Show>
+                </div>
             </Show>
         </div>
         <Show when=move || confirming.get()>
@@ -1152,6 +1169,7 @@ fn WishlistMedleyActions(
                                 type="button"
                                 on:click=move |_| on_confirm_disband.run(())
                                 disabled=move || pending.get()
+                                data-testid="medley-confirm-delete-button"
                             >
                                 {move || tr!("wishlist-medley-disband")}
                             </button>
@@ -1160,6 +1178,7 @@ fn WishlistMedleyActions(
                                 type="button"
                                 on:click=move |_| confirming.set(false)
                                 disabled=move || pending.get()
+                                data-testid="medley-cancel-delete-button"
                             >
                                 {move || tr!("admin-cancel")}
                             </button>
@@ -1206,13 +1225,14 @@ fn WishlistListItem(
     view! {
         <div class="wishlist-medley-song">
             <Show when=move || selecting_medley.get() && !grouped>
-                <label class="wishlist-medley-select">
+                <label class="wishlist-medlwishlist-medleyey-select">
                     <input
                         type="checkbox"
                         aria-label=move || tr!("wishlist-medley-select-song")
                         prop:checked=move || selected.get()
                         on:change=on_select
                         disabled=move || medley_pending.get()
+                        data-testid="song-added-to-medley-cb"
                     />
                 </label>
             </Show>
@@ -1311,6 +1331,7 @@ fn WishlistRow(
                 !item.get().feedback.iter().any(|feedback| feedback.member_id == member_id)
             }
             data-testid="wishlist-item"
+            data-song-name=move || item.get().title
         >
             <div class="wishlist-item-line">
                 <div class="wishlist-song-summary">

@@ -70,6 +70,7 @@ pub fn WishlistFeedbackControl(
                 type="button"
                 aria-expanded=move || feedback_open.get().to_string()
                 on:click=move |_| feedback_open.update(|open| *open = !*open)
+                data-testid="wishliste-feedback-edit"
             >
                 {move || tr!("wishlist-feedback-summary", {"count" => item.get().feedback.len().to_string()})}
             </button>
@@ -83,7 +84,7 @@ pub fn WishlistFeedbackControl(
                     aria-label=move || tr!("wishlist-feedback-close")
                     on:click=move |_| feedback_open.set(false)
                 >                </button>
-                <div class="wishlist-feedback-content">
+                <div class="wishlist-feedback-content" data-testid="wishlist-feedback-popup">
                     <WishlistFeedbackBadges feedbacks />
                     <WishlistFeedbackForm
                         feedbacks

@@ -24,8 +24,16 @@ body {
   line-height: 1.5;
   color: var(--color-text);
   background:
-    radial-gradient(1200px 600px at 10% -10%, var(--color-bg-accent), transparent 55%),
-    radial-gradient(900px 500px at 100% 0%, var(--color-accent-soft), transparent 50%),
+    radial-gradient(
+      1200px 600px at 10% -10%,
+      var(--color-bg-accent),
+      transparent 55%
+    ),
+    radial-gradient(
+      900px 500px at 100% 0%,
+      var(--color-accent-soft),
+      transparent 50%
+    ),
     var(--color-bg);
   -webkit-font-smoothing: antialiased;
 }
@@ -84,61 +92,66 @@ body > main {
   color: var(--color-accent);
 }
 
-button, a.btn {
-    appearance: none;
-    border: 1px solid transparent;
-    border-radius: var(--radius-sm);
-    font-family: var(--font-body);
-    font-size: 0.95rem;
-    font-weight: 600;
-    padding: 0.55rem 1rem;
-    cursor: pointer;
-    transition: background var(--transition), color var(--transition), border-color var(--transition), opacity var(--transition);
-    height: fit-content;
+button,
+a.btn {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    color var(--transition),
+    border-color var(--transition),
+    opacity var(--transition);
+  height: fit-content;
 
-    &:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  &.btn-sm {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.85rem;
+  }
+
+  &.btn-block {
+    width: 100%;
+  }
+
+  &.btn-primary {
+    background: var(--color-accent);
+    color: #fff;
+
+    &:hover:not(:disabled) {
+      background: var(--color-accent-hover);
     }
+  }
 
-    &.btn-sm {
-        padding: 0.35rem 0.7rem;
-        font-size: 0.85rem;
+  &.btn-ghost {
+    background: transparent;
+    color: var(--color-text-muted);
+    border-color: var(--color-border);
+
+    &:hover:not(:disabled) {
+      color: var(--color-text);
+      background: var(--color-accent-soft);
     }
+  }
 
-    &.btn-block {
-        width: 100%;
+  &.btn-danger {
+    color: var(--color-danger);
+    border-color: var(--color-danger);
+
+    &:hover:not(:disabled) {
+      color: #fff;
+      background: var(--color-danger);
     }
-
-    &.btn-primary {
-        background: var(--color-accent);
-        color: #fff;
-
-        &:hover:not(:disabled) {
-          background: var(--color-accent-hover);
-        }
-    }
-
-    &.btn-ghost {
-        background: transparent;
-        color: var(--color-text-muted);
-        border-color: var(--color-border);
-
-        &:hover:not(:disabled) {
-          color: var(--color-text);
-          background: var(--color-accent-soft);
-        }
-    }
-
-    &.btn-danger {
-        color: var(--color-danger);
-        border-color: var(--color-danger);
-
-        &:hover:not(:disabled) {
-          color: #fff;
-          background: var(--color-danger);
-        }
-    }
+  }
 }
 
 .lang-switcher {
@@ -162,59 +175,60 @@ button, a.btn {
 }
 
 form {
-    gap: 1em;
+  gap: 1em;
+  display: flex;
+  flex-direction: column;
+
+  > label {
+    margin-bottom: 0;
     display: flex;
     flex-direction: column;
+    gap: var(--space-2);
 
-    > label {
-        margin-bottom: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--space-2);
-
-        > span {
-            font-size: 0.875rem;
-            font-weight: 600;
-        }
+    > span {
+      font-size: 0.875rem;
+      font-weight: 600;
     }
+  }
 
-    input, select {
-        height: 2.5rem;
-        padding-block: .35rem;
-    }
+  input,
+  select {
+    height: 2.5rem;
+    padding-block: 0.35rem;
+  }
 
-    .form-fields {
-        display: grid;
-        align-items: end;
-        gap: var(--space-3);
-    }
+  .form-fields {
+    display: grid;
+    align-items: end;
+    gap: var(--space-3);
+  }
 
-    .form-actions {
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: var(--space-3);
-        width: 100%;
-        justify-content: space-between;
-    }
+  .form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: var(--space-3);
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 
 @media (min-width: 700px) {
-    form .form-fields {
-        grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 0.7fr) auto;
-    }
+  form .form-fields {
+    grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 0.7fr) auto;
+  }
 }
 
 @media (max-width: 700px) {
-    form {
-        .form-actions {
-            align-items: center;
-            flex-direction: row;
-            flex-wrap: wrap;
-            justify-content: flex-start;
-            gap: var(--space-2);
-        }
+  form {
+    .form-actions {
+      align-items: center;
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      gap: var(--space-2);
     }
+  }
 }
 
 select {
