@@ -1104,8 +1104,7 @@ fn WishlistMedleyActions(
     on_confirm_disband: Callback<()>,
 ) -> AnyView {
     let menu_open = RwSignal::new(false);
-    let pointer_listener =
-        window_event_listener(ev::pointerdown, move |_| menu_open.set(false));
+    let pointer_listener = window_event_listener(ev::pointerdown, move |_| menu_open.set(false));
     on_cleanup(move || pointer_listener.remove());
     view! {
         <div
