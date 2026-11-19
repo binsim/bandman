@@ -58,6 +58,43 @@ test.describe("Participant user logged in", () => {
   });
 });
 
+test.describe("Admin page disclosures", () => {
+  test.use({ storageState: ADMIN_FILE });
+
+  test("management lists start collapsed", async ({ page }) => {
+    await page.goto("/admin", { waitUntil: "networkidle" });
+    await expect(page.getByTestId("admin-members-section")).toBeVisible();
+    await expect(
+      page.getByTestId("admin-song-categories-section"),
+    ).toBeVisible();
+    await expect(page.getByTestId("admin-song-labels-section")).toBeVisible();
+
+    await expect(page.getByTestId("admin-members-section")).not.toHaveAttribute(
+      "open",
+      "",
+    );
+    await expect(
+      page.getByTestId("admin-song-categories-section"),
+    ).not.toHaveAttribute("open", "");
+    await expect(
+      page.getByTestId("admin-song-labels-section"),
+    ).not.toHaveAttribute("open", "");
+  });
+
+  test("member creation is inside the members disclosure", async ({ page }) => {
+    await page.goto("/admin", { waitUntil: "networkidle" });
+    const members = page.getByTestId("admin-members-section");
+    const createMember = page.getByTestId("admin-member-create-section");
+
+    await expect(createMember).toBeHidden();
+    await members.locator("summary").click();
+    await expect(createMember).toBeVisible();
+    await expect(
+      createMember.locator("xpath=ancestor::details[1]"),
+    ).toHaveAttribute("data-testid", "admin-members-section");
+  });
+});
+
 test.describe("Admin user logged in", () => {
   let nameInput: Locator;
   let roleSelect: Locator;
@@ -87,6 +124,7 @@ test.describe("Admin user logged in", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/admin", { waitUntil: "networkidle" });
     await page.locator("[data-testid='topbar']").waitFor({ state: "visible" });
+    await page.getByTestId("admin-members-section").locator("summary").click();
 
     nameInput = page.getByTestId(ADD_MEMBER_NAME_INPUT);
     roleSelect = page.getByTestId(ADD_MEMBER_ROLE_SELECT);
@@ -345,6 +383,7 @@ test.describe("Admin user logged in", () => {
     // TODO: remove waitForTimeout
     await page.waitForTimeout(20);
     await page.reload({ waitUntil: "networkidle" });
+    await page.getByTestId("admin-members-section").locator("summary").click();
 
     await expect(createdMember).toBeVisible();
     await expect(memberInput).toHaveValue(`${memberName} Edited`);
@@ -490,5 +529,68 @@ test.describe("Admin user logged in", () => {
     await expect(deleteDialog).toBeHidden();
     await expect(createdMember).toBeHidden();
     await expect(page.getByTestId("admin-table-feedback")).toHaveCount(0);
+  });
+
+  test("manages wishlist categories", async ({ page }) => {
+    await page
+      .getByTestId("admin-song-categories-section")
+      .locator("summary")
+      .click();
+    const categoryName = `Category ${randomUUID()}`;
+    const renamedCategory = `${categoryName} updated`;
+    const categoryInput = page.getByTestId("admin-song-category-name");
+    await categoryInput.fill(categoryName);
+    await page.getByTestId("admin-song-category-add").click();
+
+    let categoryRow = page.locator(`[data-category-name="${categoryName}"]`);
+    await expect(categoryRow).toBeVisible();
+    const categoryId = await categoryRow.getAttribute("data-category-id");
+    await categoryRow
+      .getByTestId("admin-song-category-row-name")
+      .fill(renamedCategory);
+    categoryRow = page.locator(`[data-category-id="${categoryId}"]`);
+    await categoryRow.getByTestId("admin-song-category-save").click();
+    categoryRow = page.locator(`[data-category-id="${categoryId}"]`);
+    await expect(categoryRow).toBeVisible();
+    await categoryRow.getByTestId("admin-song-category-delete").click();
+    await categoryRow.getByTestId("admin-song-category-confirm-delete").click();
+    await expect(categoryRow).toHaveCount(0);
+  });
+
+  test("manages wishlist labels", async ({ page }) => {
+    await page
+      .getByTestId("admin-song-labels-section")
+      .locator("summary")
+      .click();
+    const labelName = `Label ${randomUUID().slice(0, 20)}`;
+    const renamedLabel = `${labelName} updated`;
+    const labelInput = page.getByTestId("admin-song-label-name");
+    await labelInput.fill(labelName);
+    await page.getByTestId("admin-song-label-add").click();
+
+    let labelRow = page.locator(`[data-label-name="${labelName}"]`);
+    await expect(labelRow).toBeVisible();
+    const labelId = await labelRow.getAttribute("data-label-id");
+    const preview = labelRow.getByTestId("admin-song-label-preview");
+    await expect(preview).toHaveText(labelName);
+    await expect(preview).toHaveCSS("background-color", "rgb(37, 99, 235)");
+    expect(
+      await preview.evaluate(
+        (element) => element.parentElement?.firstElementChild === element,
+      ),
+    ).toBe(true);
+    await labelRow.getByTestId("admin-song-label-row-name").fill(renamedLabel);
+    labelRow = page.locator(`[data-label-id="${labelId}"]`);
+    await labelRow.locator("select").selectOption("#15803D");
+    await expect(labelRow.getByTestId("admin-song-label-preview")).toHaveCSS(
+      "background-color",
+      "rgb(21, 128, 61)",
+    );
+    await labelRow.getByTestId("admin-song-label-save").click();
+    labelRow = page.locator(`[data-label-id="${labelId}"]`);
+    await expect(labelRow).toBeVisible();
+    await labelRow.getByTestId("admin-song-label-delete").click();
+    await labelRow.getByTestId("admin-song-label-confirm-delete").click();
+    await expect(labelRow).toHaveCount(0);
   });
 });
