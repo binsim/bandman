@@ -292,7 +292,7 @@ test.describe("Wishlist", () => {
         await deleteButton.click();
         await popupDeleteButton.click();
 
-        expect(songLine).toBeHidden();
+        await expect(songLine).toBeHidden();
       });
 
       test("only creators and admins can delete songs", async ({ page }) => {
