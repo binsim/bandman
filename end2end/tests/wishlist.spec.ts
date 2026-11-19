@@ -11,6 +11,9 @@ const WISHLIST_DUPLICATE_WARNING_ERROR = "wishlist-duplicate-warning";
 const testRunId = Date.now();
 const heavyCrossTitle = `Heavy Cross ${testRunId}`;
 const testMedleyName = `Test Medley ${testRunId}`;
+const categoryName = `Party ${testRunId}`;
+const labelNames = [`Short ${testRunId}`, `Two guitars ${testRunId}`];
+const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
 const wishlistRoles = [
   ["Member", MEMBER_FILE],
   ["Participant", PARTICIPANT_FILE],
@@ -43,6 +46,8 @@ test.describe("Wishlist", () => {
   let addSongButton: Locator;
 
   const createdSongs: CreatedSong[] = [];
+  let categoryId: string;
+  const labelIds: string[] = [];
 
   async function createSong(
     request: APIRequestContext,
@@ -79,6 +84,38 @@ test.describe("Wishlist", () => {
   }
 
   test.beforeAll(async ({ browser, request }) => {
+    const adminContext = await browser.newContext({
+      baseURL,
+      storageState: ADMIN_FILE,
+    });
+    try {
+      const categoryResponse = await adminContext.request.post(
+        "/api/admin_create_song_category",
+        { form: { name: categoryName } },
+      );
+      if (!categoryResponse.ok()) {
+        throw new Error(
+          `Could not create category: ${await categoryResponse.text()}`,
+        );
+      }
+      categoryId = ((await categoryResponse.json()) as { id: string }).id;
+
+      for (const name of labelNames) {
+        const labelResponse = await adminContext.request.post(
+          "/api/admin_create_song_label",
+          { form: { name, color: "#2563EB" } },
+        );
+        if (!labelResponse.ok()) {
+          throw new Error(
+            `Could not create label: ${await labelResponse.text()}`,
+          );
+        }
+        labelIds.push(((await labelResponse.json()) as { id: string }).id);
+      }
+    } finally {
+      await adminContext.close();
+    }
+
     await createSong(request, {
       title: heavyCrossTitle,
       artist: "Gossip",
@@ -88,7 +125,6 @@ test.describe("Wishlist", () => {
     });
 
     // Create a song from every role
-    const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
     for (const [role, storageState] of wishlistRoles) {
       const context = await browser.newContext({ baseURL, storageState });
       try {
@@ -109,7 +145,7 @@ test.describe("Wishlist", () => {
     }
   });
 
-  test.afterAll(async ({ request }) => {
+  test.afterAll(async ({ browser, request }) => {
     await Promise.all(
       createdSongs.map((song) => {
         return request.post("/api/wishlist_delete", {
@@ -117,6 +153,27 @@ test.describe("Wishlist", () => {
         });
       }),
     );
+
+    const adminContext = await browser.newContext({
+      baseURL,
+      storageState: ADMIN_FILE,
+    });
+    try {
+      await Promise.all(
+        labelIds.map((id) =>
+          adminContext.request.post("/api/admin_delete_song_label", {
+            form: { id },
+          }),
+        ),
+      );
+      if (categoryId) {
+        await adminContext.request.post("/api/admin_delete_song_category", {
+          form: { id: categoryId },
+        });
+      }
+    } finally {
+      await adminContext.close();
+    }
   });
 
   for (const [role, storageState] of wishlistRoles) {
@@ -171,17 +228,115 @@ test.describe("Wishlist", () => {
         await expect(addSongButton).toBeDisabled();
       });
 
-      test("Adding song is possible", async ({ page }) => {
-        await titleInput.fill("TestSong");
+      test("New songs start uncategorized", async ({ page }) => {
+        const title = `TestSong ${role} ${testRunId}`;
+        await titleInput.fill(title);
         await artistInput.fill("TestInterpret");
         await addSongButton.click();
 
-        const songline = getSongRow(page, "TestSong");
+        const songline = getSongRow(page, title);
+        await expect(songline).toBeVisible();
+        await expect(songline.locator(".wishlist-category-badge")).toHaveCount(
+          0,
+        );
+        await expect(songline.locator(".wishlist-label-badge")).toHaveCount(0);
 
-        // Delete it again
         await songline.getByTestId("wishlist-edit").click();
-        await songline.getByTestId("wishlist-delete").click();
-        await songline.getByTestId("wishlist-confirm-delete").click();
+        const editForm = page.getByTestId("edit-song-form");
+        await editForm.getByTestId("wishlist-delete").click();
+        await page.getByTestId("wishlist-confirm-delete").click();
+      });
+
+      test("Song suggestion saves its category and labels", async ({
+        page,
+      }) => {
+        const title = `Metadata song ${role} ${testRunId}`;
+        await titleInput.fill(title);
+        await page.getByTestId("wishlist-create-metadata-open").click();
+        const popup = page.getByTestId("wishlist-create-metadata-popup");
+        await popup
+          .getByTestId("wishlist-song-category-select")
+          .selectOption(categoryId);
+        for (const id of labelIds) {
+          await popup.getByTestId(`wishlist-label-${id}`).check();
+        }
+        await popup.getByTestId("wishlist-create-metadata-done").click();
+        await addSongButton.click();
+
+        const songline = getSongRow(page, title);
+        await expect(songline.locator(".wishlist-category-badge")).toHaveText(
+          categoryName,
+        );
+        await expect(songline.locator(".wishlist-label-badge")).toHaveText(
+          labelNames,
+        );
+
+        const itemId = await songline
+          .getByTestId("wishlist-item")
+          .getAttribute("data-song-id");
+        if (!itemId) throw new Error("Created song has no data-song-id");
+        createdSongs.push({ id: itemId, title });
+
+        await songline.getByTestId("wishlist-edit").click();
+        const editForm = page.getByTestId("edit-song-form");
+        await editForm.getByTestId("wishlist-delete").click();
+        await page.getByTestId("wishlist-confirm-delete").click();
+      });
+
+      test("Song metadata can be changed and cleared", async ({ page }) => {
+        const title = `Editable metadata ${role} ${testRunId}`;
+        await titleInput.fill(title);
+        await addSongButton.click();
+        const songline = getSongRow(page, title);
+        const itemRow = songline.getByTestId("wishlist-item");
+        const itemId = await itemRow.getAttribute("data-song-id");
+        if (!itemId) throw new Error("Created song has no data-song-id");
+        createdSongs.push({ id: itemId, title });
+
+        await songline.getByTestId("wishlist-edit").click();
+        const editForm = page.getByTestId("edit-song-form");
+        const metadata = editForm.getByTestId("wishlist-metadata-details");
+        await metadata.locator("summary").click();
+        await editForm
+          .getByTestId("wishlist-song-category-select")
+          .selectOption(categoryId);
+        await editForm.getByTestId(`wishlist-label-${labelIds[0]}`).check();
+        await expect(
+          editForm.getByTestId("wishlist-metadata-save"),
+        ).toHaveCount(0);
+        await editForm.getByTestId("wishlist-save-edit").click();
+        const badges = itemRow.locator(".wishlist-song-summary");
+        await expect(badges.locator(".wishlist-category-badge")).toHaveText(
+          categoryName,
+        );
+        await expect(badges.locator(".wishlist-label-badge")).toHaveText(
+          labelNames[0],
+        );
+        await expect(badges.locator(".wishlist-label-badge")).toHaveCSS(
+          "background-color",
+          "rgb(37, 99, 235)",
+        );
+
+        await songline.getByTestId("wishlist-edit").click();
+        const clearMetadataForm = page.getByTestId("edit-song-form");
+        await clearMetadataForm
+          .getByTestId("wishlist-metadata-details")
+          .locator("summary")
+          .click();
+        await clearMetadataForm
+          .getByTestId("wishlist-song-category-select")
+          .selectOption("");
+        await clearMetadataForm
+          .getByTestId(`wishlist-label-${labelIds[0]}`)
+          .uncheck();
+        await clearMetadataForm.getByTestId("wishlist-save-edit").click();
+        await expect(badges.locator(".wishlist-category-badge")).toHaveCount(0);
+        await expect(badges.locator(".wishlist-label-badge")).toHaveCount(0);
+
+        await songline.getByTestId("wishlist-edit").click();
+        const reopenedEditForm = page.getByTestId("edit-song-form");
+        await reopenedEditForm.getByTestId("wishlist-delete").click();
+        await page.getByTestId("wishlist-confirm-delete").click();
       });
 
       test("Wishlist item is well formatted", async ({ page }) => {
@@ -201,6 +356,22 @@ test.describe("Wishlist", () => {
 
         await expect(line.getByTestId("wishlist-edit")).toBeVisible();
         await expect(line.getByTestId("wishliste-feedback-edit")).toBeVisible();
+      });
+
+      test("category toggle includes uncategorized songs on mobile", async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width: 390, height: 844 });
+        await page.getByTestId("filter-all-songs").click();
+        const categoryToggle = page.getByTestId("wishlist-view-categories");
+        await categoryToggle.check();
+
+        await expect(page.getByTestId("wishlist-category-group")).toBeVisible();
+        await expect(getSongRow(page, heavyCrossTitle)).toBeVisible();
+        await expect(categoryToggle).toBeChecked();
+
+        await categoryToggle.uncheck();
+        await expect(categoryToggle).not.toBeChecked();
       });
 
       test("Adding feedback is possible", async ({ page }) => {
@@ -235,15 +406,24 @@ test.describe("Wishlist", () => {
       });
 
       test("Editing song is possible", async ({ page }) => {
-        await titleInput.fill("Dummy Title");
+        const dummyTitle = `Dummy Title ${testRunId}`;
+        await titleInput.fill(dummyTitle);
         await addSongButton.click();
 
-        const songLine = getSongRow(page, "Dummy Title");
+        const songLine = getSongRow(page, dummyTitle);
         const editButton = songLine.getByTestId("wishlist-edit");
         await editButton.click();
 
-        const editForm = songLine.getByTestId("edit-song-form");
+        const editForm = page.getByTestId("edit-song-form");
         await expect(editForm).toBeVisible();
+        await expect(
+          songLine.getByTestId("wishlist-metadata-edit"),
+        ).toHaveCount(0);
+        const metadata = editForm.getByTestId("wishlist-metadata-details");
+        await metadata.locator("summary").click();
+        await expect(
+          editForm.getByTestId("wishlist-song-category-select"),
+        ).toBeVisible();
 
         const songArtistInputField = editForm.getByTestId("wishlist-artist");
         const saveButton = editForm.getByTestId("wishlist-save-edit");
@@ -273,10 +453,10 @@ test.describe("Wishlist", () => {
 
         await editButton.click();
         await deleteButton.click();
-        const deletePopup = songLine.getByTestId("delete-confirmation-popup");
+        const deletePopup = page.getByTestId("delete-confirmation-popup");
 
         await expect(deletePopup).toBeVisible();
-        await expect(deletePopup).toContainText("Dummy Title");
+        await expect(deletePopup).toContainText(dummyTitle);
         const popupCancelButton = deletePopup.getByTestId(
           "wishlist-cancel-delete",
         );
@@ -303,7 +483,8 @@ test.describe("Wishlist", () => {
           await expect(songRow).toBeVisible();
           await songRow.getByTestId("wishlist-edit").click();
 
-          const deleteButton = songRow.getByTestId("wishlist-delete");
+          const editForm = page.getByTestId("edit-song-form");
+          const deleteButton = editForm.getByTestId("wishlist-delete");
           if (role === "Admin" || role === song.role) {
             await expect(deleteButton).toBeVisible();
           } else {
@@ -315,7 +496,7 @@ test.describe("Wishlist", () => {
               });
             expect(deniedDelete.ok()).toBe(false);
           }
-          await songRow.getByTestId("wishlist-cancel-edit").click();
+          await editForm.getByTestId("wishlist-cancel-edit").click();
         }
       });
 
@@ -360,6 +541,32 @@ test.describe("Wishlist", () => {
         await expect(medleyLine).toBeVisible();
       });
 
+      test("medley metadata uses the single save button", async ({ page }) => {
+        const medleyLine = page.locator(
+          `[data-medley-name="${testMedleyName}"]`,
+        );
+        await medleyLine.getByTestId("medley-manage-button").click();
+        await medleyLine.getByTestId("medley-edit-button").click();
+        await medleyLine
+          .getByTestId("wishlist-metadata-details")
+          .locator("summary")
+          .click();
+        await medleyLine
+          .getByTestId("wishlist-song-category-select")
+          .selectOption(categoryId);
+        await medleyLine.getByTestId(`wishlist-label-${labelIds[1]}`).check();
+        await expect(
+          medleyLine.getByTestId("wishlist-metadata-save"),
+        ).toHaveCount(0);
+        await medleyLine.getByTestId("medley-save-button").click();
+        await expect(medleyLine.locator(".wishlist-category-badge")).toHaveText(
+          categoryName,
+        );
+        await expect(medleyLine.locator(".wishlist-label-badge")).toHaveText(
+          labelNames[1],
+        );
+      });
+
       test("modifying medley is possible", async ({ page }) => {
         const medleySongs = createdSongs.filter((song) => song.role);
         const medleyLine = page.locator(
@@ -398,6 +605,15 @@ test.describe("Wishlist", () => {
         await expect(medleyNameInput).toBeVisible();
         await expect(medleySaveButton).toBeVisible();
         await expect(medleyCancelButton).toBeVisible();
+        const medleyMetadata = medleyLine.getByTestId(
+          "wishlist-metadata-details",
+        );
+        await expect(medleyMetadata).toBeVisible();
+        await medleyMetadata.locator("summary").click();
+        await expect(
+          medleyLine.getByTestId("wishlist-song-category-select"),
+        ).toBeVisible();
+        await medleyMetadata.locator("summary").click();
 
         await medleyNameInput.fill("Another Name");
         await medleyCancelButton.click();
@@ -472,4 +688,126 @@ test.describe("Wishlist", () => {
       });
     });
   }
+
+  test.describe("Metadata picker", () => {
+    test.use({ storageState: MEMBER_FILE });
+
+    test.beforeEach(async ({ page }) => {
+      await page.goto("/wishlist", { waitUntil: "networkidle" });
+    });
+
+    test("fits the mobile viewport", async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByTestId("wishlist-create-metadata-open").click();
+      const popup = page.getByTestId("wishlist-create-metadata-popup");
+      await expect(
+        page.getByTestId("wishlist-create-metadata-dialog"),
+      ).toHaveAttribute("aria-modal", "true");
+
+      const bounds = await popup
+        .locator(".wishlist-metadata-dialog")
+        .boundingBox();
+      const viewportWidth = await page.evaluate(() => window.innerWidth);
+      const viewportHeight = await page.evaluate(() => window.innerHeight);
+      expect(bounds).not.toBeNull();
+      expect(bounds!.x).toBeGreaterThanOrEqual(0);
+      expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewportWidth);
+      expect(bounds!.y).toBeGreaterThanOrEqual(0);
+      expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewportHeight);
+    });
+
+    test("closes with Escape", async ({ page }) => {
+      await page.getByTestId("wishlist-create-metadata-open").click();
+      await expect(
+        page.getByTestId("wishlist-create-metadata-popup"),
+      ).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(
+        page.getByTestId("wishlist-create-metadata-popup"),
+      ).toBeHidden();
+    });
+
+    test("edit popup stays centered in the viewport", async ({ page }) => {
+      const title = `AAA viewport popup ${testRunId}`;
+      await page.getByTestId("add-song-name").fill(title);
+      await page.getByTestId("create-song").click();
+      const songRow = getSongRow(page, title);
+      await expect(songRow).toBeVisible();
+      const itemId = await songRow
+        .getByTestId("wishlist-item")
+        .getAttribute("data-song-id");
+      if (!itemId) throw new Error("Created song has no data-song-id");
+      createdSongs.push({ id: itemId, title });
+
+      await page.locator("body > main").evaluate((main) => {
+        main.style.minHeight = "500vh";
+      });
+      await songRow.getByTestId("wishlist-edit").click();
+
+      const popup = page.getByTestId("edit-song-form");
+      await expect(popup).toBeVisible();
+      const bounds = await popup.locator(".wishlist-edit-form").boundingBox();
+      const viewportHeight = await page.evaluate(() => window.innerHeight);
+
+      expect(bounds).not.toBeNull();
+      expect(
+        Math.abs(bounds!.y + bounds!.height / 2 - viewportHeight / 2),
+      ).toBeLessThan(20);
+      await popup.getByTestId("wishlist-cancel-edit").click();
+    });
+  });
+
+  test.describe("Category layout", () => {
+    test.use({ storageState: MEMBER_FILE });
+
+    test.beforeEach(async ({ page }) => {
+      await page.goto("/wishlist", { waitUntil: "networkidle" });
+    });
+
+    test("pairs groups on desktop and centers an odd final group", async ({
+      page,
+    }) => {
+      await page.locator("body > main").evaluate((main) => {
+        const fixture = document.createElement("div");
+        fixture.className = "wishlist-category-groups";
+        fixture.dataset.testid = "category-layout-fixture";
+        for (let index = 1; index <= 3; index += 1) {
+          const group = document.createElement("section");
+          group.className = "wishlist-category-group";
+          group.textContent = `Category ${index}`;
+          fixture.append(group);
+        }
+        main.append(fixture);
+      });
+
+      const fixture = page.getByTestId("category-layout-fixture");
+      const groups = fixture.locator(".wishlist-category-group");
+      const boxes = await groups.evaluateAll((elements) =>
+        elements.map((element) => {
+          const { x, y, width } = element.getBoundingClientRect();
+          return { x, y, width };
+        }),
+      );
+      const bounds = await fixture.boundingBox();
+      const desktop = await page.evaluate(() => window.innerWidth >= 900);
+
+      expect(bounds).not.toBeNull();
+      expect(boxes).toHaveLength(3);
+      if (desktop) {
+        expect(Math.abs(boxes[0].y - boxes[1].y)).toBeLessThan(2);
+        expect(boxes[0].x).toBeLessThan(boxes[1].x);
+        expect(boxes[2].y).toBeGreaterThan(boxes[1].y);
+        expect(
+          Math.abs(
+            boxes[2].x + boxes[2].width / 2 - (bounds!.x + bounds!.width / 2),
+          ),
+        ).toBeLessThan(2);
+      } else {
+        expect(Math.abs(boxes[0].x - boxes[1].x)).toBeLessThan(2);
+        expect(Math.abs(boxes[1].x - boxes[2].x)).toBeLessThan(2);
+        expect(boxes[0].y).toBeLessThan(boxes[1].y);
+        expect(boxes[1].y).toBeLessThan(boxes[2].y);
+      }
+    });
+  });
 });

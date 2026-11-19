@@ -39,7 +39,7 @@ pub fn WishlistFeedbackControl(
         pending.set(true);
         error.set(None);
         leptos::task::spawn_local(async move {
-            match super::wishlist_set_feedback(item.get_untracked().id, category).await {
+            match super::api::wishlist_set_feedback(item.get_untracked().id, category).await {
                 Ok(feedback) => {
                     item.update(|item| {
                         item.feedback

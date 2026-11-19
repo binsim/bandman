@@ -1,4 +1,5 @@
 mod create_member;
+mod song_metadata;
 
 use crate::{
     models::{Member, MemberRole},
@@ -6,6 +7,7 @@ use crate::{
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
+use song_metadata::SongMetadataAdmin;
 use uuid::Uuid;
 
 type MemberFeedback = Option<(Uuid, String)>;
@@ -114,14 +116,15 @@ fn AdminMembersLoaded(members: Vec<Member>, current_member: Member) -> impl Into
     });
 
     view! {
-        <CreateMemberForm on_created=on_member_created />
         <MembersTable
             members
             current_member
+            on_member_created=on_member_created
             on_member_updated=on_member_updated
             on_member_deleted
             feedback
         />
+        <SongMetadataAdmin />
     }
 }
 
@@ -138,46 +141,53 @@ fn sort_members(members: &mut [Member]) {
 fn MembersTable(
     members: RwSignal<Vec<Member>>,
     current_member: Member,
+    on_member_created: Callback<Member>,
     on_member_updated: Callback<Member>,
     on_member_deleted: Callback<Uuid>,
     feedback: RwSignal<MemberFeedback>,
 ) -> impl IntoView {
     view! {
-        <section class="card">
-            <header>
-                <h2>{move || tr!("admin-members-title")}</h2>
-            </header>
-            <div class="admin-table-wrap">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>{move || tr!("admin-column-name")}</th>
-                            <th>{move || tr!("admin-column-role")}</th>
-                            <th>{move || tr!("admin-column-status")}</th>
-                            <th>{move || tr!("admin-column-last-login")}</th>
-                            <th><span class="sr-only">{move || tr!("admin-column-actions")}</span></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <For
-                            each=move || members.get()
-                            key=|member| member.id
-                            children=move |member| {
-                                let is_current_member = current_member.id == member.id;
-                                view! {
-                                    <MemberRow
-                                        member
-                                        is_current_member
-                                        on_change=on_member_updated
-                                        on_deleted=on_member_deleted
-                                        feedback
-                                    />
-                                }
-                            }
-                        />
-                    </tbody>
-                </table>
-            </div>
+        <section class="card admin-disclosure">
+            <details data-testid="admin-members-section">
+                <summary>
+                    <span>{move || tr!("admin-members-title")}</span>
+                    <span class="admin-disclosure-count">{move || members.get().len()}</span>
+                </summary>
+                <div class="admin-members-content">
+                    <CreateMemberForm on_created=on_member_created />
+                    <div class="admin-table-wrap">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>{move || tr!("admin-column-name")}</th>
+                                    <th>{move || tr!("admin-column-role")}</th>
+                                    <th>{move || tr!("admin-column-status")}</th>
+                                    <th>{move || tr!("admin-column-last-login")}</th>
+                                    <th><span class="sr-only">{move || tr!("admin-column-actions")}</span></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <For
+                                    each=move || members.get()
+                                    key=|member| member.id
+                                    children=move |member| {
+                                        let is_current_member = current_member.id == member.id;
+                                        view! {
+                                            <MemberRow
+                                                member
+                                                is_current_member
+                                                on_change=on_member_updated
+                                                on_deleted=on_member_deleted
+                                                feedback
+                                            />
+                                        }
+                                    }
+                                />
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </details>
         </section>
     }
 }

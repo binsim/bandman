@@ -2,6 +2,7 @@ use crate::auth::{current_member, logout};
 use crate::components::language::LanguageSwitcher;
 use crate::components::theme::ThemeToggle;
 use crate::models::{Member, MemberRole};
+use leptos::portal::Portal;
 use leptos::{ev, prelude::*};
 use leptos_fluent::tr;
 use leptos_router::components::A;
@@ -10,12 +11,16 @@ use leptos_router::hooks::use_location;
 #[component]
 pub fn PopupModal(
     #[prop(optional, into)] data_testid: Option<String>,
-    children: Children,
+    children: ChildrenFn,
 ) -> impl IntoView {
+    let data_testid = StoredValue::new(data_testid);
+
     view! {
-        <div class="popup-modal" data-testid=data_testid>
-            {children()}
-        </div>
+        <Portal>
+            <div class="popup-modal" data-testid=move || data_testid.get_value()>
+                {children()}
+            </div>
+        </Portal>
     }
 }
 

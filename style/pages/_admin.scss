@@ -15,10 +15,100 @@
   overflow-x: auto;
 }
 
+.admin-disclosure summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.admin-disclosure details[open] > summary {
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.admin-disclosure-count {
+  margin-inline-start: var(--space-2);
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+  font-weight: 400;
+}
+
+.admin-members-content {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.admin-member-create {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+
+  h2 {
+    margin: 0 0 var(--space-3);
+    font-size: 1.05rem;
+  }
+}
+
+.admin-member-create-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(10rem, 0.8fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+
+  > .btn {
+    height: 2.75rem;
+    white-space: nowrap;
+  }
+}
+
+.admin-form-field {
+  display: grid;
+  min-width: 0;
+  gap: var(--space-2);
+
+  > span {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    font-weight: 600;
+  }
+
+  > .input,
+  > .select {
+    height: 2.75rem;
+  }
+}
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   text-align: left;
+
+  th:nth-child(1),
+  td:nth-child(1) {
+    width: 24%;
+  }
+
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 16%;
+  }
+
+  th:nth-child(3),
+  td:nth-child(3) {
+    width: 14%;
+  }
+
+  th:nth-child(4),
+  td:nth-child(4) {
+    width: 20%;
+  }
+
+  th:nth-child(5),
+  td:nth-child(5) {
+    width: 26%;
+  }
 
   th,
   td {
@@ -58,11 +148,61 @@
 
 .admin-actions {
   text-align: right;
+
+  .admin-role-control {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    white-space: nowrap;
+  }
 }
 
 .admin-feedback {
   margin: var(--space-3) 0 0;
   color: var(--color-accent);
+}
+
+.song-metadata-options-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.song-metadata-option {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.song-metadata-option-form {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.song-metadata-option-form > .input,
+.song-metadata-option-form > .select {
+  flex: 1 1 12rem;
+  width: auto;
+  min-width: 0;
+  height: 2.5rem;
+}
+
+.song-metadata-option-form > .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.admin-song-label-preview {
+  flex: 0 0 auto;
+  justify-content: center;
+  min-width: 6rem;
+}
+
+.song-metadata-confirm {
+  padding: var(--space-2);
 }
 
 .admin-row-feedback {
@@ -78,6 +218,7 @@
   place-items: center;
   padding: var(--space-4);
   background: rgb(0 0 0 / 0.5);
+  pointer-events: auto;
 }
 
 .admin-delete-dialog {
@@ -109,6 +250,14 @@
 }
 
 @media (max-width: 700px) {
+  .admin-member-create-form {
+    grid-template-columns: minmax(0, 1fr);
+
+    > .btn {
+      width: 100%;
+    }
+  }
+
   .admin-table {
     display: block;
     width: 100%;
@@ -147,6 +296,14 @@
     tbody {
       display: block;
       width: 100%;
+    }
+  }
+
+  .admin-actions {
+    text-align: left;
+
+    .admin-role-control {
+      justify-content: flex-start;
     }
   }
 }

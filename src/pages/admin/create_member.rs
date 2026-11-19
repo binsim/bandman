@@ -50,53 +50,50 @@ pub fn CreateMemberForm(on_created: Callback<Member>) -> impl IntoView {
     };
 
     view! {
-        <section class="card">
-            <header>
-                <h2>{move || tr!("admin-add-title")}</h2>
-            </header>
-            <form on:submit=on_create>
-                <div class="form-fields">
-                    <label>
-                        <span>{move || tr!("admin-name-label")}</span>
-                        <input
-                            class="input"
-                            data-testid="admin-member-name"
-                            type="text"
-                            maxlength="80"
-                            required
-                            prop:value=move || name.get()
-                            on:input=move |event| name.set(event_target_value(&event))
-                        />
-                    </label>
-                    <label>
-                        <span>{move || tr!("admin-role-label")}</span>
-                        <select
-                            class="select"
-                            data-testid="admin-member-role"
-                            prop:value=move || role.get().to_string()
-                            on:change=move |event| {
-                                match event_target_value(&event).parse::<MemberRole>() {
-                                    Ok(value) => role.set(value),
-                                    Err(_) => error.set(Some(tr!("admin-error-role"))),
-                                }
+        <section class="admin-member-create" data-testid="admin-member-create-section">
+            <h2>{move || tr!("admin-add-title")}</h2>
+            <form class="admin-member-create-form" on:submit=on_create>
+                <label class="admin-form-field">
+                    <span>{move || tr!("admin-name-label")}</span>
+                    <input
+                        class="input"
+                        data-testid="admin-member-name"
+                        type="text"
+                        maxlength="80"
+                        required
+                        prop:value=move || name.get()
+                        on:input=move |event| name.set(event_target_value(&event))
+                        disabled=move || pending.get()
+                    />
+                </label>
+                <label class="admin-form-field">
+                    <span>{move || tr!("admin-role-label")}</span>
+                    <select
+                        class="select"
+                        data-testid="admin-member-role"
+                        prop:value=move || role.get().to_string()
+                        on:change=move |event| {
+                            match event_target_value(&event).parse::<MemberRole>() {
+                                Ok(value) => role.set(value),
+                                Err(_) => error.set(Some(tr!("admin-error-role"))),
                             }
-                        >
-                            <option value=MemberRole::Admin.to_string()>{move || tr!("admin-role-admin")}</option>
-                            <option value=MemberRole::Member.to_string()>{move || tr!("admin-role-member")}</option>
-                            <option value=MemberRole::Participant.to_string()>{move || tr!("admin-role-participant")}</option>
-                        </select>
-                    </label>
-                    <button
-                        class="btn btn-primary"
-                        data-testid="admin-create-member"
-                        type="submit"
+                        }
                         disabled=move || pending.get()
                     >
-                        {move || tr!("admin-add-button")}
-                    </button>
-                </div>
+                        <option value=MemberRole::Admin.to_string()>{move || tr!("admin-role-admin")}</option>
+                        <option value=MemberRole::Member.to_string()>{move || tr!("admin-role-member")}</option>
+                        <option value=MemberRole::Participant.to_string()>{move || tr!("admin-role-participant")}</option>
+                    </select>
+                </label>
+                <button
+                    class="btn btn-primary"
+                    data-testid="admin-create-member"
+                    type="submit"
+                    disabled=move || pending.get()
+                >
+                    {move || tr!("admin-add-button")}
+                </button>
             </form>
-
             <Show when=move || error.get().is_some()>
                 <p class="form-error" role="alert" data-testid="admin-create-error">
                     {move || error.get().unwrap_or_default()}

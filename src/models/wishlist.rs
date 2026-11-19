@@ -1,3 +1,6 @@
+use super::song_metadata::{SongCategory, SongLabel, SongMetadataOptions};
+#[cfg(feature = "ssr")]
+use super::song_metadata::{SongMetadataAssignment, SongMetadataError, validate_assignment};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
@@ -82,6 +85,10 @@ pub struct WishlistItem {
     pub musical_key: Option<String>,
     pub targets: Vec<String>,
     pub category: WishlistCategory,
+    pub song_category: Option<SongCategory>,
+    pub labels: Vec<SongLabel>,
+    pub medley_category: Option<SongCategory>,
+    pub medley_labels: Vec<SongLabel>,
     pub feedback: Vec<WishlistFeedback>,
     pub proposed_by: String,
     pub created_at: DateTime<Utc>,
@@ -92,6 +99,12 @@ pub struct WishlistFeedback {
     pub member_id: Uuid,
     pub member_name: String,
     pub category: WishlistCategory,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WishlistData {
+    pub items: Vec<WishlistItem>,
+    pub metadata: SongMetadataOptions,
 }
 
 #[cfg(feature = "ssr")]
@@ -129,6 +142,8 @@ pub enum WishlistError {
     NotFound,
     #[error(transparent)]
     Database(#[from] sqlx::Error),
+    #[error(transparent)]
+    Metadata(#[from] SongMetadataError),
 }
 
 #[cfg(feature = "ssr")]
@@ -142,6 +157,10 @@ impl<'r> FromRow<'r, PgRow> for WishlistItem {
                     index: "category".to_string(),
                     source: Box::new(error),
                 })?;
+        let song_category_id: Option<Uuid> = row.try_get("song_category_id")?;
+        let song_category_name: Option<String> = row.try_get("song_category_name")?;
+        let medley_category_id: Option<Uuid> = row.try_get("medley_category_id")?;
+        let medley_category_name: Option<String> = row.try_get("medley_category_name")?;
 
         Ok(Self {
             id: row.try_get("id")?,
@@ -159,6 +178,14 @@ impl<'r> FromRow<'r, PgRow> for WishlistItem {
             musical_key: row.try_get("musical_key")?,
             targets: row.try_get("targets")?,
             category,
+            song_category: song_category_id
+                .zip(song_category_name)
+                .map(|(id, name)| SongCategory { id, name }),
+            labels: Vec::new(),
+            medley_category: medley_category_id
+                .zip(medley_category_name)
+                .map(|(id, name)| SongCategory { id, name }),
+            medley_labels: Vec::new(),
             feedback: Vec::new(),
             proposed_by: row.try_get("proposed_by_name")?,
             created_at: row.try_get("created_at")?,
@@ -174,17 +201,60 @@ impl WishlistItem {
             SELECT item.id, item.proposed_by, membership.medley_id, membership.position AS medley_position,
                 NULLIF(count(membership.wishlist_item_id) OVER (PARTITION BY membership.medley_id), 0) AS medley_size,
                 medley.created_by AS medley_created_by, medley.name AS medley_name,
+                item_category.id AS song_category_id, item_category.name AS song_category_name,
+                medley_category.id AS medley_category_id, medley_category.name AS medley_category_name,
                 item.title, item.artist, item.link, item.tempo, item.musical_key,
                 item.link_title, item.targets, item.category, item.proposed_by_name, item.created_at
             FROM wishlist_items AS item
             LEFT JOIN wishlist_medley_items AS membership ON membership.wishlist_item_id = item.id
             LEFT JOIN wishlist_medleys AS medley ON medley.id = membership.medley_id
+            LEFT JOIN wishlist_categories AS item_category ON item_category.id = item.song_category_id
+            LEFT JOIN wishlist_categories AS medley_category ON medley_category.id = medley.song_category_id
             ORDER BY COALESCE(lower(medley.name), lower(item.title)),
                 membership.position NULLS FIRST, lower(item.title), item.title
             "#,
         )
         .fetch_all(pool)
         .await?;
+
+        let labels = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
+            r#"
+            SELECT assignment.wishlist_item_id, label.id, label.name, label.color
+            FROM wishlist_item_labels AS assignment
+            JOIN wishlist_labels AS label ON label.id = assignment.label_id
+            ORDER BY lower(label.name), label.name
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+        for (item_id, id, name, color) in labels {
+            if let Some(item) = items.iter_mut().find(|item| item.id == item_id) {
+                item.labels.push(SongLabel { id, name, color });
+            }
+        }
+
+        let medley_labels = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
+            r#"
+            SELECT assignment.medley_id, label.id, label.name, label.color
+            FROM wishlist_medley_labels AS assignment
+            JOIN wishlist_labels AS label ON label.id = assignment.label_id
+            ORDER BY lower(label.name), label.name
+            "#,
+        )
+        .fetch_all(pool)
+        .await?;
+        for (medley_id, id, name, color) in medley_labels {
+            for item in items
+                .iter_mut()
+                .filter(|item| item.medley_id == Some(medley_id))
+            {
+                item.medley_labels.push(SongLabel {
+                    id,
+                    name: name.clone(),
+                    color: color.clone(),
+                });
+            }
+        }
 
         let feedback = sqlx::query_as::<_, (Uuid, Uuid, String, String)>(
             r#"
@@ -214,6 +284,128 @@ impl WishlistItem {
             }
         }
         Ok(items)
+    }
+
+    pub async fn set_song_metadata(
+        pool: &PgPool,
+        item_id: Uuid,
+        category_id: Option<Uuid>,
+        label_ids: &[Uuid],
+    ) -> Result<SongMetadataAssignment, SongMetadataError> {
+        let label_ids = validate_assignment(pool, category_id, label_ids).await?;
+        let mut transaction = pool.begin().await?;
+        let updated = sqlx::query_scalar::<_, Uuid>(
+            "UPDATE wishlist_items SET song_category_id = $1 WHERE id = $2 RETURNING id",
+        )
+        .bind(category_id)
+        .bind(item_id)
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if updated.is_none() {
+            return Err(SongMetadataError::NotFound);
+        }
+
+        sqlx::query("DELETE FROM wishlist_item_labels WHERE wishlist_item_id = $1")
+            .bind(item_id)
+            .execute(&mut *transaction)
+            .await?;
+        for label_id in label_ids {
+            sqlx::query(
+                "INSERT INTO wishlist_item_labels (wishlist_item_id, label_id) VALUES ($1, $2)",
+            )
+            .bind(item_id)
+            .bind(label_id)
+            .execute(&mut *transaction)
+            .await?;
+        }
+        transaction.commit().await?;
+
+        Self::song_metadata_assignment(pool, item_id).await
+    }
+
+    pub async fn set_medley_metadata(
+        pool: &PgPool,
+        medley_id: Uuid,
+        category_id: Option<Uuid>,
+        label_ids: &[Uuid],
+    ) -> Result<SongMetadataAssignment, SongMetadataError> {
+        let label_ids = validate_assignment(pool, category_id, label_ids).await?;
+        let mut transaction = pool.begin().await?;
+        let updated = sqlx::query_scalar::<_, Uuid>(
+            "UPDATE wishlist_medleys SET song_category_id = $1 WHERE id = $2 RETURNING id",
+        )
+        .bind(category_id)
+        .bind(medley_id)
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if updated.is_none() {
+            return Err(SongMetadataError::NotFound);
+        }
+
+        sqlx::query("DELETE FROM wishlist_medley_labels WHERE medley_id = $1")
+            .bind(medley_id)
+            .execute(&mut *transaction)
+            .await?;
+        for label_id in label_ids {
+            sqlx::query("INSERT INTO wishlist_medley_labels (medley_id, label_id) VALUES ($1, $2)")
+                .bind(medley_id)
+                .bind(label_id)
+                .execute(&mut *transaction)
+                .await?;
+        }
+        transaction.commit().await?;
+
+        Self::medley_metadata_assignment(pool, medley_id).await
+    }
+
+    async fn song_metadata_assignment(
+        pool: &PgPool,
+        item_id: Uuid,
+    ) -> Result<SongMetadataAssignment, SongMetadataError> {
+        let category = sqlx::query_as::<_, SongCategory>(
+            "SELECT id, name FROM wishlist_categories WHERE id = (SELECT song_category_id FROM wishlist_items WHERE id = $1)",
+        )
+        .bind(item_id)
+        .fetch_optional(pool)
+        .await?;
+        let labels = sqlx::query_as::<_, SongLabel>(
+            r#"
+            SELECT label.id, label.name, label.color
+            FROM wishlist_item_labels AS assignment
+            JOIN wishlist_labels AS label ON label.id = assignment.label_id
+            WHERE assignment.wishlist_item_id = $1
+            ORDER BY lower(label.name), label.name
+            "#,
+        )
+        .bind(item_id)
+        .fetch_all(pool)
+        .await?;
+        Ok(SongMetadataAssignment { category, labels })
+    }
+
+    async fn medley_metadata_assignment(
+        pool: &PgPool,
+        medley_id: Uuid,
+    ) -> Result<SongMetadataAssignment, SongMetadataError> {
+        let category = sqlx::query_as::<_, SongCategory>(
+            "SELECT id, name FROM wishlist_categories WHERE id = (SELECT song_category_id FROM wishlist_medleys WHERE id = $1)",
+        )
+        .bind(medley_id)
+        .fetch_optional(pool)
+        .await?;
+        let labels = sqlx::query_as::<_, SongLabel>(
+            r#"
+            SELECT label.id, label.name, label.color
+            FROM wishlist_medley_labels AS assignment
+            JOIN wishlist_labels AS label ON label.id = assignment.label_id
+            WHERE assignment.medley_id = $1
+            ORDER BY lower(label.name), label.name
+            "#,
+        )
+        .bind(medley_id)
+        .fetch_all(pool)
+        .await?;
+        Ok(SongMetadataAssignment { category, labels })
     }
 
     pub async fn create_medley(
@@ -312,6 +504,44 @@ impl WishlistItem {
         member_id: Uuid,
         is_admin: bool,
     ) -> Result<(), WishlistError> {
+        Self::update_medley_inner(pool, medley_id, item_ids, name, member_id, is_admin, None).await
+    }
+
+    pub async fn update_medley_with_metadata(
+        pool: &PgPool,
+        medley_id: Uuid,
+        item_ids: &[Uuid],
+        name: &str,
+        member_id: Uuid,
+        is_admin: bool,
+        category_id: Option<Uuid>,
+        label_ids: &[Uuid],
+    ) -> Result<SongMetadataAssignment, WishlistError> {
+        let label_ids = validate_assignment(pool, category_id, label_ids).await?;
+        Self::update_medley_inner(
+            pool,
+            medley_id,
+            item_ids,
+            name,
+            member_id,
+            is_admin,
+            Some((category_id, label_ids)),
+        )
+        .await?;
+        Self::medley_metadata_assignment(pool, medley_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    async fn update_medley_inner(
+        pool: &PgPool,
+        medley_id: Uuid,
+        item_ids: &[Uuid],
+        name: &str,
+        member_id: Uuid,
+        is_admin: bool,
+        metadata: Option<(Option<Uuid>, Vec<Uuid>)>,
+    ) -> Result<(), WishlistError> {
         let name = validate_medley_name(name)?;
         if item_ids.len() < 2
             || item_ids
@@ -376,6 +606,26 @@ impl WishlistItem {
             .bind(medley_id)
             .execute(&mut *transaction)
             .await?;
+        if let Some((category_id, label_ids)) = metadata {
+            sqlx::query("UPDATE wishlist_medleys SET song_category_id = $1 WHERE id = $2")
+                .bind(category_id)
+                .bind(medley_id)
+                .execute(&mut *transaction)
+                .await?;
+            sqlx::query("DELETE FROM wishlist_medley_labels WHERE medley_id = $1")
+                .bind(medley_id)
+                .execute(&mut *transaction)
+                .await?;
+            for label_id in label_ids {
+                sqlx::query(
+                    "INSERT INTO wishlist_medley_labels (medley_id, label_id) VALUES ($1, $2)",
+                )
+                .bind(medley_id)
+                .bind(label_id)
+                .execute(&mut *transaction)
+                .await?;
+            }
+        }
         sqlx::query("DELETE FROM wishlist_medley_items WHERE medley_id = $1")
             .bind(medley_id)
             .execute(&mut *transaction)
@@ -847,19 +1097,61 @@ impl WishlistItem {
         is_admin: bool,
         details: WishlistSongDetails<'_>,
     ) -> Result<Self, WishlistError> {
+        Self::update_details_with_optional_metadata(
+            pool, item_id, member_id, is_admin, details, None,
+        )
+        .await
+    }
+
+    pub async fn update_details_with_song_metadata(
+        pool: &PgPool,
+        item_id: Uuid,
+        member_id: Uuid,
+        is_admin: bool,
+        details: WishlistSongDetails<'_>,
+        category_id: Option<Uuid>,
+        label_ids: &[Uuid],
+    ) -> Result<Self, WishlistError> {
+        let label_ids = validate_assignment(pool, category_id, label_ids).await?;
+        Self::update_details_with_optional_metadata(
+            pool,
+            item_id,
+            member_id,
+            is_admin,
+            details,
+            Some((category_id, label_ids)),
+        )
+        .await
+    }
+
+    async fn update_details_with_optional_metadata(
+        pool: &PgPool,
+        item_id: Uuid,
+        member_id: Uuid,
+        is_admin: bool,
+        details: WishlistSongDetails<'_>,
+        metadata: Option<(Option<Uuid>, Vec<Uuid>)>,
+    ) -> Result<Self, WishlistError> {
         let title = validate_title(details.title)?;
         let artist = validate_artist(details.artist)?;
         let link = validate_link(details.link)?;
         let tempo = validate_tempo(details.tempo)?;
         let musical_key = validate_musical_key(details.musical_key)?;
 
+        let (update_metadata, category_id, label_ids) = match metadata {
+            Some((category_id, label_ids)) => (true, category_id, Some(label_ids)),
+            None => (false, None, None),
+        };
+        let mut transaction = pool.begin().await?;
         let updated = sqlx::query_as::<_, Self>(
             r#"
             UPDATE wishlist_items
-            SET title = $1, artist = $2, link = $3, link_title = $4, tempo = $5, musical_key = $6
-            WHERE id = $7 AND (proposed_by = $8 OR $9)
+            SET title = $1, artist = $2, link = $3, link_title = $4, tempo = $5, musical_key = $6,
+                song_category_id = CASE WHEN $7 THEN $8 ELSE song_category_id END
+            WHERE id = $9 AND (proposed_by = $10 OR $11)
             RETURNING id, proposed_by, title, artist, link, link_title, tempo, musical_key, targets,
-                category, proposed_by_name, created_at, NULL::UUID AS medley_id,
+                category, proposed_by_name, created_at, song_category_id, NULL::TEXT AS song_category_name,
+                NULL::UUID AS medley_category_id, NULL::TEXT AS medley_category_name, NULL::UUID AS medley_id,
                 NULL::INTEGER AS medley_position, NULL::BIGINT AS medley_size,
                 NULL::UUID AS medley_created_by, NULL::TEXT AS medley_name
             "#,
@@ -870,16 +1162,40 @@ impl WishlistItem {
         .bind(details.link_title)
         .bind(tempo)
         .bind(&musical_key)
+        .bind(update_metadata)
+        .bind(category_id)
         .bind(item_id)
         .bind(member_id)
         .bind(is_admin)
-        .fetch_optional(pool)
+        .fetch_optional(&mut *transaction)
         .await
         .map_err(map_wishlist_unique_violation)?;
         if let Some(updated) = updated {
-            return Ok(updated);
+            if let Some(label_ids) = label_ids {
+                sqlx::query("DELETE FROM wishlist_item_labels WHERE wishlist_item_id = $1")
+                    .bind(item_id)
+                    .execute(&mut *transaction)
+                    .await?;
+                for label_id in label_ids {
+                    sqlx::query(
+                        "INSERT INTO wishlist_item_labels (wishlist_item_id, label_id) VALUES ($1, $2)",
+                    )
+                    .bind(item_id)
+                    .bind(label_id)
+                    .execute(&mut *transaction)
+                    .await?;
+                }
+            }
+            transaction.commit().await?;
+            let metadata = Self::song_metadata_assignment(pool, item_id).await?;
+            return Ok(Self {
+                song_category: metadata.category,
+                labels: metadata.labels,
+                ..updated
+            });
         }
 
+        transaction.rollback().await?;
         let exists: bool =
             sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM wishlist_items WHERE id = $1)")
                 .bind(item_id)
@@ -930,12 +1246,37 @@ impl WishlistItem {
         member_id: Uuid,
         member_name: &str,
     ) -> Result<Self, WishlistError> {
+        Self::create_with_song_metadata(
+            pool,
+            details,
+            targets,
+            category,
+            member_id,
+            member_name,
+            None,
+            &[],
+        )
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_with_song_metadata(
+        pool: &PgPool,
+        details: WishlistSongDetails<'_>,
+        targets: &[String],
+        category: WishlistCategory,
+        member_id: Uuid,
+        member_name: &str,
+        song_category_id: Option<Uuid>,
+        label_ids: &[Uuid],
+    ) -> Result<Self, WishlistError> {
         let title = validate_title(details.title)?;
         let artist = validate_artist(details.artist)?;
         let link = validate_link(details.link)?;
         let targets = validate_targets(targets)?;
         let tempo = validate_tempo(details.tempo)?;
         let musical_key = validate_musical_key(details.musical_key)?;
+        let label_ids = validate_assignment(pool, song_category_id, label_ids).await?;
 
         let existing: bool = sqlx::query_scalar(
             r#"
@@ -955,13 +1296,17 @@ impl WishlistItem {
             return Err(WishlistError::DuplicateSong);
         }
 
-        sqlx::query_as::<_, Self>(
+        let mut transaction = pool.begin().await?;
+        let mut item = sqlx::query_as::<_, Self>(
             r#"
             INSERT INTO wishlist_items
-                (id, title, artist, link, link_title, tempo, musical_key, targets, category, proposed_by, proposed_by_name)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                (id, title, artist, link, link_title, tempo, musical_key, targets, category, proposed_by, proposed_by_name, song_category_id)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
             RETURNING id, proposed_by, title, artist, link, link_title, tempo, musical_key, targets, category,
-                proposed_by_name, created_at, NULL::UUID AS medley_id, NULL::INTEGER AS medley_position,
+                proposed_by_name, created_at, song_category_id,
+                (SELECT name FROM wishlist_categories WHERE id = wishlist_items.song_category_id) AS song_category_name,
+                NULL::UUID AS medley_category_id, NULL::TEXT AS medley_category_name, NULL::UUID AS medley_id,
+                NULL::INTEGER AS medley_position,
                 NULL::BIGINT AS medley_size, NULL::UUID AS medley_created_by, NULL::TEXT AS medley_name
             "#,
         )
@@ -976,9 +1321,35 @@ impl WishlistItem {
         .bind(category.to_string())
         .bind(member_id)
         .bind(member_name)
-        .fetch_one(pool)
+        .bind(song_category_id)
+        .fetch_one(&mut *transaction)
         .await
-        .map_err(map_wishlist_unique_violation)
+        .map_err(map_wishlist_unique_violation)?;
+
+        for label_id in label_ids {
+            sqlx::query(
+                "INSERT INTO wishlist_item_labels (wishlist_item_id, label_id) VALUES ($1, $2)",
+            )
+            .bind(item.id)
+            .bind(label_id)
+            .execute(&mut *transaction)
+            .await?;
+        }
+        item.labels = sqlx::query_as::<_, SongLabel>(
+            r#"
+            SELECT label.id, label.name, label.color
+            FROM wishlist_item_labels AS assignment
+            JOIN wishlist_labels AS label ON label.id = assignment.label_id
+            WHERE assignment.wishlist_item_id = $1
+            ORDER BY lower(label.name), label.name
+            "#,
+        )
+        .bind(item.id)
+        .fetch_all(&mut *transaction)
+        .await?;
+        transaction.commit().await?;
+
+        Ok(item)
     }
 }
 
@@ -1227,6 +1598,196 @@ mod tests {
             .expect("created song should be listed");
         assert_eq!(listed.tempo, Some(124));
         assert_eq!(listed.musical_key.as_deref(), Some("G major"));
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn song_and_medley_metadata_is_persisted(pool: PgPool) {
+        let member = Member::find_active_by_name(&pool, "Admin")
+            .await
+            .expect("seeded member lookup should succeed")
+            .expect("migration should seed an admin");
+        let song = WishlistItem::create(
+            &pool,
+            "Metadata song",
+            None,
+            None,
+            None,
+            &[],
+            WishlistCategory::Song,
+            member.id,
+            &member.name,
+        )
+        .await
+        .expect("song should be saved");
+        let second_song = WishlistItem::create(
+            &pool,
+            "Metadata song two",
+            None,
+            None,
+            None,
+            &[],
+            WishlistCategory::Song,
+            member.id,
+            &member.name,
+        )
+        .await
+        .expect("second song should be saved");
+        let category = SongCategory::create(&pool, "Party")
+            .await
+            .expect("category should be created");
+        let song_label = SongLabel::create(&pool, "2 guitars", "#2563EB")
+            .await
+            .expect("label should be created");
+        let medley_label = SongLabel::create(&pool, "Short", "#15803D")
+            .await
+            .expect("label should be created");
+
+        let updated_song = WishlistItem::update_details_with_song_metadata(
+            &pool,
+            song.id,
+            member.id,
+            true,
+            WishlistSongDetails {
+                title: "Updated metadata song",
+                artist: None,
+                link: None,
+                link_title: None,
+                tempo: None,
+                musical_key: None,
+            },
+            Some(category.id),
+            &[song_label.id, song_label.id],
+        )
+        .await
+        .expect("song details and metadata should be updated together");
+        assert_eq!(updated_song.title, "Updated metadata song");
+        assert_eq!(updated_song.song_category, Some(category.clone()));
+        assert_eq!(updated_song.labels, [song_label.clone()]);
+
+        let medley_id = WishlistItem::create_medley(
+            &pool,
+            &[song.id, second_song.id],
+            "Metadata medley",
+            member.id,
+        )
+        .await
+        .expect("medley should be created");
+        let medley_assignment = WishlistItem::update_medley_with_metadata(
+            &pool,
+            medley_id,
+            &[song.id, second_song.id],
+            "Updated metadata medley",
+            member.id,
+            true,
+            Some(category.clone().id),
+            &[medley_label.id],
+        )
+        .await
+        .expect("medley details and metadata should be updated together");
+        assert_eq!(medley_assignment.category, Some(category.clone()));
+        assert_eq!(medley_assignment.labels, [medley_label.clone()]);
+
+        let listed = WishlistItem::list(&pool)
+            .await
+            .expect("wishlist should load");
+        let listed_song = listed.iter().find(|item| item.id == song.id).unwrap();
+        assert_eq!(listed_song.song_category.as_ref().unwrap().name, "Party");
+        assert_eq!(listed_song.labels, [song_label.clone()]);
+        assert_eq!(listed_song.medley_category.as_ref().unwrap().name, "Party");
+        assert_eq!(listed_song.medley_labels, [medley_label.clone()]);
+
+        SongLabel::delete(&pool, song_label.id)
+            .await
+            .expect("song label should be removable");
+        SongLabel::delete(&pool, medley_label.id)
+            .await
+            .expect("medley label should be removable");
+        SongCategory::delete(&pool, category.id)
+            .await
+            .expect("category should be removable");
+        let listed = WishlistItem::list(&pool)
+            .await
+            .expect("wishlist should load after metadata removal");
+        let listed_song = listed.iter().find(|item| item.id == song.id).unwrap();
+        assert!(listed_song.song_category.is_none());
+        assert!(listed_song.labels.is_empty());
+        assert!(listed_song.medley_category.is_none());
+        assert!(listed_song.medley_labels.is_empty());
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn suggested_song_is_created_with_category_and_labels(pool: PgPool) {
+        let member = Member::find_active_by_name(&pool, "Admin")
+            .await
+            .unwrap()
+            .unwrap();
+        let category = SongCategory::create(&pool, "Dancing").await.unwrap();
+        let label = SongLabel::create(&pool, "Two guitars", "#2563EB")
+            .await
+            .unwrap();
+
+        let item = WishlistItem::create_with_song_metadata(
+            &pool,
+            WishlistSongDetails {
+                title: "Song with metadata",
+                artist: None,
+                link: None,
+                link_title: None,
+                tempo: None,
+                musical_key: None,
+            },
+            &[],
+            WishlistCategory::Song,
+            member.id,
+            &member.name,
+            Some(category.id),
+            &[label.id],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(item.song_category, Some(category));
+        assert_eq!(item.labels, [label]);
+    }
+
+    #[sqlx::test(migrations = "./migrations")]
+    async fn invalid_metadata_does_not_create_suggested_song(pool: PgPool) {
+        let member = Member::find_active_by_name(&pool, "Admin")
+            .await
+            .unwrap()
+            .unwrap();
+        let result = WishlistItem::create_with_song_metadata(
+            &pool,
+            WishlistSongDetails {
+                title: "Invalid metadata song",
+                artist: None,
+                link: None,
+                link_title: None,
+                tempo: None,
+                musical_key: None,
+            },
+            &[],
+            WishlistCategory::Song,
+            member.id,
+            &member.name,
+            Some(Uuid::new_v4()),
+            &[],
+        )
+        .await;
+
+        assert!(matches!(
+            result,
+            Err(WishlistError::Metadata(
+                SongMetadataError::InvalidAssignment
+            ))
+        ));
+        assert!(
+            !WishlistItem::list(&pool)
+                .await
+                .unwrap()
+                .iter()
+                .any(|item| item.title == "Invalid metadata song")
+        );
     }
 
     #[sqlx::test(migrations = "./migrations")]
