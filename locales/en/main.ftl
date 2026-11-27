@@ -122,7 +122,6 @@ wishlist-empty = No song wishes yet. Be the first to add one!
 wishlist-filter-label = Filter song wishes
 wishlist-filter-needs-feedback = Needs my feedback
 wishlist-filter-all = All songs
-wishlist-group-by-category = Group by category
 wishlist-uncategorized = Uncategorized
 wishlist-song-category = Category
 wishlist-labels = Labels

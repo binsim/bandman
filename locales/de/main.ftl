@@ -122,7 +122,6 @@ wishlist-empty = Noch keine Songwünsche. Füge den ersten hinzu!
 wishlist-filter-label = Songwünsche filtern
 wishlist-filter-needs-feedback = Meine Rückmeldung fehlt
 wishlist-filter-all = Alle Songs
-wishlist-group-by-category = Nach Kategorien gruppieren
 wishlist-uncategorized = Ohne Kategorie
 wishlist-song-category = Kategorie
 wishlist-labels = Labels

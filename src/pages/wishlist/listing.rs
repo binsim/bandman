@@ -1,7 +1,7 @@
 use super::{
     grouping::{
-        WishlistCategoryGroup, WishlistDisplayEntry, group_wishlist_items,
-        group_wishlist_items_by_category, sort_wishlist_items,
+        WishlistCategoryGroup, WishlistDisplayEntry, group_wishlist_items_by_category,
+        sort_wishlist_items,
     },
     medley::{WishlistMedley, WishlistMedleyControls},
     metadata::SongMetadataBadges,
@@ -19,7 +19,6 @@ pub(super) fn WishlistListing(
     current_member: Member,
     show_needs_feedback: RwSignal<bool>,
     on_filter_changed: Callback<bool>,
-    split_by_category: RwSignal<bool>,
     selecting_medley: RwSignal<bool>,
     new_medley_name: RwSignal<String>,
     selected_songs: RwSignal<Vec<uuid::Uuid>>,
@@ -32,28 +31,25 @@ pub(super) fn WishlistListing(
     on_remove_medley_item: Callback<(uuid::Uuid, uuid::Uuid)>,
     on_move_medley_item: Callback<(uuid::Uuid, uuid::Uuid, i32)>,
 ) -> AnyView {
-    let entries = Memo::new(move |_| group_wishlist_items(visible_items.get()));
     let category_groups = Memo::new(move |_| group_wishlist_items_by_category(visible_items.get()));
     let member_store = StoredValue::new(current_member);
     view! {
-        <section class="card">
-            <header>
-                <div style="display:flex; justify-content:space-between;width:100%">
-                    <h2 id="wishlist-list-title">{move || tr!("wishlist-list-title")}
-                        <span class="muted">{move || tr!("wishlist-count", {"count" => items.get().len().to_string()})}</span>
-                    </h2>
+        <section class="card wishlist-listing">
+            <header class="wishlist-listing-header">
+                <h2 id="wishlist-list-title">{move || tr!("wishlist-list-title")}
+                    <span class="muted">{move || tr!("wishlist-count", {"count" => items.get().len().to_string()})}</span>
+                </h2>
 
-                    <Show when=move || !selecting_medley.get()>
-                        <button
-                            class="btn btn-primary btn-sm"
-                            type="button"
-                            on:click=move |_| on_start_creating_medley.run(())
-                            data-testid="wishlist-create-medley"
-                        >
-                            {move || tr!("wishlist-medley-start")}
-                        </button>
-                    </Show>
-                </div>
+                <Show when=move || !selecting_medley.get()>
+                    <button
+                        class="btn btn-primary btn-sm"
+                        type="button"
+                        on:click=move |_| on_start_creating_medley.run(())
+                        data-testid="wishlist-create-medley"
+                    >
+                        {move || tr!("wishlist-medley-start")}
+                    </button>
+                </Show>
             </header>
 
             <Show when=move || !selecting_medley.get()>
@@ -80,15 +76,6 @@ pub(super) fn WishlistListing(
                             {move || tr!("wishlist-filter-all")}
                         </button>
                     </div>
-                    <label class="wishlist-category-toggle">
-                        <input
-                            type="checkbox"
-                            prop:checked=move || split_by_category.get()
-                            on:change=move |event| split_by_category.set(event_target_checked(&event))
-                            data-testid="wishlist-view-categories"
-                        />
-                        <span>{move || tr!("wishlist-group-by-category")}</span>
-                    </label>
                 </div>
             </Show>
             <WishlistMedleyControls
@@ -110,60 +97,50 @@ pub(super) fn WishlistListing(
                     when=move || !visible_items.get().is_empty()
                     fallback=|| view! { <p class="wishlist-empty">{move || tr!("wishlist-no-feedback-pending")}</p> }
                 >
-                    <Show when=move || !split_by_category.get()>
-                    <div class="wishlist-items">
-                        <WishlistItemList
-                            items
-                            entries
-                            current_member=member_store.read_value().clone()
-                            selecting_medley
-                            selected_songs
-                            medley_pending
-                            on_disband_medley
-                            on_medley_renamed
-                            on_remove_medley_item
-                            on_move_medley_item
+                    <div class="wishlist-category-groups">
+                        <For
+                            each=move || category_groups.get()
+                            key=WishlistCategoryGroup::key
+                            children=move |group| {
+                                let group_key = group.key();
+                                let entry_count = group.entries.len();
+                                let category_name = group
+                                    .category
+                                    .map(|category| category.name)
+                                    .unwrap_or_else(|| tr!("wishlist-uncategorized"));
+                                let group_entries = Memo::new(move |_| {
+                                    category_groups
+                                        .get()
+                                        .into_iter()
+                                        .find(|group| group.key() == group_key)
+                                        .map(|group| group.entries)
+                                        .unwrap_or_default()
+                                });
+                                view! {
+                                    <section class="wishlist-category-group" data-testid="wishlist-category-group">
+                                        <div class="wishlist-category-header">
+                                            <h3>{category_name}</h3>
+                                            <span class="wishlist-category-count">{entry_count.to_string()}</span>
+                                        </div>
+                                        <div class="wishlist-items">
+                                            <WishlistItemList
+                                                items
+                                                entries=group_entries
+                                                current_member=member_store.read_value().clone()
+                                                selecting_medley
+                                                selected_songs
+                                                medley_pending
+                                                on_disband_medley
+                                                on_medley_renamed
+                                                on_remove_medley_item
+                                                on_move_medley_item
+                                            />
+                                        </div>
+                                    </section>
+                                }
+                            }
                         />
                     </div>
-                    </Show>
-                    <Show when=move || split_by_category.get()>
-                        <div class="wishlist-category-groups">
-                            <For
-                                each=move || category_groups.get()
-                                key=WishlistCategoryGroup::key
-                                children=move |group| {
-                                    let group_key = group.key();
-                                    let group_entries = Memo::new(move |_| {
-                                        category_groups
-                                            .get()
-                                            .into_iter()
-                                            .find(|group| group.key() == group_key)
-                                            .map(|group| group.entries)
-                                            .unwrap_or_default()
-                                    });
-                                    view! {
-                                        <section class="wishlist-category-group" data-testid="wishlist-category-group">
-                                            <h3>{group.category.map(|category| category.name).unwrap_or_else(|| tr!("wishlist-uncategorized"))}</h3>
-                                            <div class="wishlist-items">
-                                                <WishlistItemList
-                                                    items
-                                                    entries=group_entries
-                                                    current_member=member_store.read_value().clone()
-                                                    selecting_medley
-                                                    selected_songs
-                                                    medley_pending
-                                                    on_disband_medley
-                                                    on_medley_renamed
-                                                    on_remove_medley_item
-                                                    on_move_medley_item
-                                                />
-                                            </div>
-                                        </section>
-                                    }
-                                }
-                            />
-                        </div>
-                    </Show>
                 </Show>
             </Show>
         </section>

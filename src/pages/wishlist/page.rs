@@ -16,39 +16,41 @@ pub fn WishlistPage() -> impl IntoView {
     let member = expect_context::<Resource<Option<crate::models::Member>>>();
     let wishlist = Resource::new(|| (), |_| async move { wishlist_list().await });
     view! {
-        <Suspense fallback=|| view! {
-            <section>
-                <h1>{move || tr!("nav-wishlist")}</h1>
-                <p class="muted">{move || tr!("wishlist-loading")}</p>
-            </section>
-        }>
-            {move || match member.get().flatten() {
-                Some(member) => {
-                    match wishlist.get() {
-                        Some(Ok(data)) => view! {
-                            <WishlistLoaded
-                                initial_data=data
-                                current_member=member
-                            />
-                        }.into_any(),
-                        Some(Err(error)) => view! {
-                            <section>
-                                <h1>{tr!("nav-wishlist")}</h1>
-                                <p class="from-error" role="alert">{error.to_string()}</p>
-                            </section>
-                        }.into_any(),
-                        None => ().into_any(),
+        <div class="wishlist-page">
+            <Suspense fallback=|| view! {
+                <section>
+                    <h1>{move || tr!("nav-wishlist")}</h1>
+                    <p class="muted">{move || tr!("wishlist-loading")}</p>
+                </section>
+            }>
+                {move || match member.get().flatten() {
+                    Some(member) => {
+                        match wishlist.get() {
+                            Some(Ok(data)) => view! {
+                                <WishlistLoaded
+                                    initial_data=data
+                                    current_member=member
+                                />
+                            }.into_any(),
+                            Some(Err(error)) => view! {
+                                <section>
+                                    <h1>{tr!("nav-wishlist")}</h1>
+                                    <p class="from-error" role="alert">{error.to_string()}</p>
+                                </section>
+                            }.into_any(),
+                            None => ().into_any(),
+                        }
                     }
-                }
-                None => view! {
-                    <section>
-                        <h1>{tr!("nav-wishlist")}</h1>
-                        <p>{tr!("wishlist-sign-in")}</p>
-                        <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
-                    </section>
-                }.into_any(),
-            }}
-        </Suspense>
+                    None => view! {
+                        <section>
+                            <h1>{tr!("nav-wishlist")}</h1>
+                            <p>{tr!("wishlist-sign-in")}</p>
+                            <a class="btn btn-primary" href="/login">{move || tr!("nav-login")}</a>
+                        </section>
+                    }.into_any(),
+                }}
+            </Suspense>
+        </div>
     }
 }
 
@@ -56,7 +58,6 @@ pub fn WishlistPage() -> impl IntoView {
 fn WishlistLoaded(initial_data: WishlistData, current_member: Member) -> AnyView {
     let items = RwSignal::new(initial_data.items);
     provide_context(RwSignal::new(initial_data.metadata));
-    let split_by_category = RwSignal::new(false);
     let medley_management_active = RwSignal::new(false);
     provide_context(medley_management_active);
     let editing_medley_id = RwSignal::new(Option::<uuid::Uuid>::None);
@@ -306,7 +307,6 @@ fn WishlistLoaded(initial_data: WishlistData, current_member: Member) -> AnyView
             current_member
             show_needs_feedback
             on_filter_changed
-            split_by_category
             selecting_medley
             new_medley_name
             selected_songs

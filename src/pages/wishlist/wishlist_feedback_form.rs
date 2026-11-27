@@ -1,5 +1,6 @@
 use leptos::prelude::*;
 
+use crate::components::layout::PopupModal;
 use crate::models::{Member, WishlistCategory, WishlistFeedback, WishlistItem};
 use leptos_fluent::tr;
 
@@ -22,17 +23,24 @@ pub fn WishlistFeedbackControl(
 ) -> AnyView {
     let initial_item = item.get_untracked();
     let is_medley = initial_item.medley_id.is_some();
+    let member_id = current_member.id;
+    let current_member = StoredValue::new(current_member);
     let selected = RwSignal::new(
         initial_item
             .feedback
             .iter()
-            .find(|feedback| feedback.member_id == current_member.id)
+            .find(|feedback| feedback.member_id == member_id)
             .map(|feedback| feedback.category),
     );
     let pending = RwSignal::new(false);
     let error = RwSignal::new(Option::<String>::None);
     let feedback_open = RwSignal::new(false);
     let feedbacks = RwSignal::new(initial_item.feedback);
+    let close_feedback = Callback::new(move |_: ()| {
+        if !pending.get_untracked() {
+            feedback_open.set(false);
+        }
+    });
     let save_feedback = Callback::new(move |event: leptos::ev::SubmitEvent| {
         event.prevent_default();
         let category = selected.get_untracked();
@@ -43,7 +51,7 @@ pub fn WishlistFeedbackControl(
                 Ok(feedback) => {
                     item.update(|item| {
                         item.feedback
-                            .retain(|existing| existing.member_id != current_member.id);
+                            .retain(|existing| existing.member_id != member_id);
                         if let Some(feedback) = feedback.clone() {
                             item.feedback.push(feedback);
                             item.feedback.sort_by(|left, right| {
@@ -74,28 +82,39 @@ pub fn WishlistFeedbackControl(
             >
                 {move || tr!("wishlist-feedback-summary", {"count" => item.get().feedback.len().to_string()})}
             </button>
-            <Show
-                clone:current_member
-                when=move || feedback_open.get()
-            >
-                <button
-                    class="wishlist-feedback-backdrop"
-                    type="button"
-                    aria-label=move || tr!("wishlist-feedback-close")
-                    on:click=move |_| feedback_open.set(false)
-                >                </button>
-                <div class="wishlist-feedback-content" data-testid="wishlist-feedback-popup">
-                    <WishlistFeedbackBadges feedbacks />
-                    <WishlistFeedbackForm
-                        feedbacks
-                        current_member=current_member.clone()
-                        is_medley
-                        selected
-                        pending
-                        error
-                        on_save=save_feedback
-                    />
-                </div>
+            <Show when=move || feedback_open.get()>
+                <PopupModal data_testid="wishlist-feedback-popup">
+                    <button
+                        class="wishlist-edit-backdrop"
+                        type="button"
+                        aria-label=move || tr!("wishlist-feedback-close")
+                        on:click=move |_| close_feedback.run(())
+                        disabled=move || pending.get()
+                    ></button>
+                    <div
+                        class="wishlist-feedback-content popup-modal-panel"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label=move || tr!("wishlist-feedback-label")
+                        on:keydown=move |event: leptos::ev::KeyboardEvent| {
+                            if event.key() == "Escape" {
+                                close_feedback.run(());
+                            }
+                        }
+                    >
+                        <WishlistFeedbackBadges feedbacks />
+                        <WishlistFeedbackForm
+                            feedbacks
+                            current_member=current_member.get_value()
+                            is_medley
+                            selected
+                            pending
+                            error
+                            on_save=save_feedback
+                            on_cancel=close_feedback
+                        />
+                    </div>
+                </PopupModal>
             </Show>
         </div>
     }
@@ -132,6 +151,7 @@ fn WishlistFeedbackForm(
     pending: RwSignal<bool>,
     error: RwSignal<Option<String>>,
     on_save: Callback<leptos::ev::SubmitEvent>,
+    on_cancel: Callback<()>,
 ) -> AnyView {
     let has_own_feedback = Memo::new(move |_| {
         feedbacks
@@ -176,18 +196,28 @@ fn WishlistFeedbackForm(
                         </Show>
                     </select>
                 </label>
-                <button
-                    class="btn btn-primary btn-sm"
-                    type="submit"
-                    data-testid="wishlist-feedback-save"
-                    disabled=move || pending.get() || (selected.get().is_none() && !has_own_feedback.get())
-                >
-                    {move || if pending.get() {
-                        tr!("wishlist-feedback-saving")
-                    } else {
-                        tr!("wishlist-feedback-save")
-                    }}
-                </button>
+                <div class="form-actions">
+                    <button
+                        class="btn btn-primary btn-sm"
+                        type="submit"
+                        data-testid="wishlist-feedback-save"
+                        disabled=move || pending.get() || (selected.get().is_none() && !has_own_feedback.get())
+                    >
+                        {move || if pending.get() {
+                            tr!("wishlist-feedback-saving")
+                        } else {
+                            tr!("wishlist-feedback-save")
+                        }}
+                    </button>
+                    <button
+                        class="btn btn-ghost btn-sm"
+                        type="button"
+                        on:click=move |_| on_cancel.run(())
+                        disabled=move || pending.get()
+                    >
+                        {move || tr!("admin-cancel")}
+                    </button>
+                </div>
             </form>
             <Show when=move || error.get().is_some()>
                 <p class="form-error" role="alert">{move || error.get().unwrap_or_default()}</p>

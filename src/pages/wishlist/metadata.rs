@@ -5,23 +5,25 @@ use leptos_fluent::tr;
 #[component]
 pub(super) fn SongMetadataBadges(assignment: Signal<SongMetadataAssignment>) -> impl IntoView {
     view! {
-        <Show when=move || assignment.get().category.is_some()>
-            <span class="wishlist-badge wishlist-category-badge">
-                {move || assignment.get().category.map(|category| category.name).unwrap_or_default()}
-            </span>
-        </Show>
-        <For
-            each=move || assignment.get().labels
-            key=|label| label.id
-            children=move |label| view! {
-                <span
-                    class="wishlist-badge wishlist-label-badge"
-                    style=move || format!("--label-color: {}", label.color)
-                >
-                    {label.name}
+        <div class="wishlist-metadata-badges">
+            <Show when=move || assignment.get().category.is_some()>
+                <span class="wishlist-badge wishlist-category-badge">
+                    {move || assignment.get().category.map(|category| category.name).unwrap_or_default()}
                 </span>
-            }
-        />
+            </Show>
+            <For
+                each=move || assignment.get().labels
+                key=|label| label.id
+                children=move |label| view! {
+                    <span
+                        class="wishlist-badge wishlist-label-badge"
+                        style=move || format!("--label-color: {}", label.color)
+                    >
+                        {label.name}
+                    </span>
+                }
+            />
+        </div>
     }
 }
 

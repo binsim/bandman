@@ -358,27 +358,28 @@ test.describe("Wishlist", () => {
         await expect(line.getByTestId("wishliste-feedback-edit")).toBeVisible();
       });
 
-      test("category toggle includes uncategorized songs on mobile", async ({
-        page,
-      }) => {
+      test("wishlist is grouped by category by default", async ({ page }) => {
         await page.setViewportSize({ width: 390, height: 844 });
         await page.getByTestId("filter-all-songs").click();
-        const categoryToggle = page.getByTestId("wishlist-view-categories");
-        await categoryToggle.check();
+        const categoryGroups = page.getByTestId("wishlist-category-group");
+        const uncategorizedGroup = categoryGroups.filter({
+          has: page.getByRole("heading", { name: "Uncategorized" }),
+        });
 
-        await expect(page.getByTestId("wishlist-category-group")).toBeVisible();
-        await expect(getSongRow(page, heavyCrossTitle)).toBeVisible();
-        await expect(categoryToggle).toBeChecked();
-
-        await categoryToggle.uncheck();
-        await expect(categoryToggle).not.toBeChecked();
+        await expect(page.getByTestId("wishlist-view-categories")).toHaveCount(
+          0,
+        );
+        await expect(categoryGroups.first()).toBeVisible();
+        await expect(
+          uncategorizedGroup.locator(`[data-song-name="${heavyCrossTitle}"]`),
+        ).toBeVisible();
       });
 
       test("Adding feedback is possible", async ({ page }) => {
         const line = getSongRow(page, heavyCrossTitle);
         await line.getByTestId("wishliste-feedback-edit").click();
 
-        const feedbackForm = line.getByTestId("wishlist-feedback-popup");
+        const feedbackForm = page.getByTestId("wishlist-feedback-popup");
         const feedbackSelect = feedbackForm.getByTestId(
           "wishlist-feedback-select",
         );
