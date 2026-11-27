@@ -295,12 +295,14 @@ fn WishlistLoaded(initial_data: WishlistData, current_member: Member) -> AnyView
     });
 
     view! {
-        <section>
-            <p class="eyebrow">{move || tr!("wishlist-eyebrow")}</p>
-            <h1>{move || tr!("nav-wishlist")}</h1>
-            <p class="lead">{move || tr!("wishlist-lead")}</p>
+        <section class="wishlist-hero">
+            <div class="wishlist-hero-copy">
+                <p class="eyebrow">{move || tr!("wishlist-eyebrow")}</p>
+                <h1>{move || tr!("nav-wishlist")}</h1>
+                <p class="lead">{move || tr!("wishlist-lead")}</p>
+            </div>
+            <CreateSong items on_created=on_song_created />
         </section>
-        <CreateSong items on_created=on_song_created />
         <WishlistListing
             items
             visible_items

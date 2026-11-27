@@ -592,7 +592,7 @@ pub fn CreateSong(
     };
 
     view! {
-        <section class="card">
+        <section class="card wishlist-create">
             <header>
                 <h2>{move || tr!("wishlist-add-title")}</h2>
             </header>
