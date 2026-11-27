@@ -1,6 +1,8 @@
 #[cfg(feature = "ssr")]
 use crate::models::{SongCategory, SongMetadataOptions, WishlistItem};
-use crate::models::{SongMetadataAssignment, WishlistCategory, WishlistData, WishlistFeedback};
+use crate::models::{
+    SongMetadataAssignment, SongMetadataSelection, WishlistCategory, WishlistData, WishlistFeedback,
+};
 use leptos::prelude::*;
 
 #[server(WishlistList, "/api")]
@@ -51,8 +53,7 @@ pub(super) async fn wishlist_update_medley(
     medley_id: uuid::Uuid,
     item_ids: Vec<uuid::Uuid>,
     name: String,
-    category_id: Option<uuid::Uuid>,
-    label_ids: Option<Vec<uuid::Uuid>>,
+    metadata: Option<SongMetadataSelection>,
 ) -> Result<SongMetadataAssignment, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::auth::session::require_member().await?;
@@ -63,8 +64,7 @@ pub(super) async fn wishlist_update_medley(
         &name,
         member.id,
         member.role == crate::models::MemberRole::Admin,
-        category_id,
-        label_ids.as_deref().unwrap_or_default(),
+        metadata.unwrap_or_default(),
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))

@@ -4,7 +4,7 @@ use crate::models::WISHLIST_MUSICAL_KEYS;
 use crate::models::{WishlistCategory, WishlistSongDetails};
 use crate::{
     components::layout::PopupModal,
-    models::{Member, MemberRole, SongMetadataOptions, WishlistItem},
+    models::{Member, MemberRole, SongMetadataOptions, SongMetadataSelection, WishlistItem},
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
@@ -99,8 +99,7 @@ async fn wishlist_update(
     link: String,
     tempo: String,
     musical_key: String,
-    category_id: Option<uuid::Uuid>,
-    label_ids: Option<Vec<uuid::Uuid>>,
+    metadata: Option<SongMetadataSelection>,
 ) -> Result<WishlistItem, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::auth::session::require_member().await?;
@@ -119,8 +118,7 @@ async fn wishlist_update(
             tempo,
             musical_key: Some(&musical_key),
         },
-        category_id,
-        label_ids.as_deref().unwrap_or_default(),
+        metadata.unwrap_or_default(),
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))
@@ -341,8 +339,10 @@ pub fn EditSongForm(
                 link.get(),
                 tempo.get(),
                 musical_key.get(),
-                category_id.get(),
-                Some(label_ids.get()),
+                Some(SongMetadataSelection {
+                    category_id: category_id.get(),
+                    label_ids: label_ids.get(),
+                }),
             )
             .await
             {

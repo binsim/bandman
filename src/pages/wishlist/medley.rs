@@ -4,7 +4,10 @@ use super::{
     listing::{WishlistListItem, WishlistRow},
     metadata::{SongMetadataBadges, SongMetadataFields},
 };
-use crate::models::{Member, MemberRole, SongMetadataAssignment, WishlistFeedback, WishlistItem};
+use crate::models::{
+    Member, MemberRole, SongMetadataAssignment, SongMetadataSelection, WishlistFeedback,
+    WishlistItem,
+};
 use leptos::{ev, prelude::*};
 use leptos_fluent::tr;
 
@@ -206,8 +209,10 @@ pub(super) fn WishlistMedley(
                 id,
                 ordered_ids.clone(),
                 new_name.clone(),
-                category_id,
-                Some(label_ids),
+                Some(SongMetadataSelection {
+                    category_id,
+                    label_ids,
+                }),
             )
             .await
             {

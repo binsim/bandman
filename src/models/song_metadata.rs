@@ -28,6 +28,12 @@ pub struct SongMetadataAssignment {
     pub labels: Vec<SongLabel>,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SongMetadataSelection {
+    pub category_id: Option<Uuid>,
+    pub label_ids: Vec<Uuid>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SongMetadataOptions {
     pub categories: Vec<SongCategory>,

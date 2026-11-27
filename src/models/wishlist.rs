@@ -1,6 +1,8 @@
 use super::song_metadata::{SongCategory, SongLabel, SongMetadataOptions};
 #[cfg(feature = "ssr")]
-use super::song_metadata::{SongMetadataAssignment, SongMetadataError, validate_assignment};
+use super::song_metadata::{
+    SongMetadataAssignment, SongMetadataError, SongMetadataSelection, validate_assignment,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "ssr")]
@@ -514,10 +516,10 @@ impl WishlistItem {
         name: &str,
         member_id: Uuid,
         is_admin: bool,
-        category_id: Option<Uuid>,
-        label_ids: &[Uuid],
+        metadata: SongMetadataSelection,
     ) -> Result<SongMetadataAssignment, WishlistError> {
-        let label_ids = validate_assignment(pool, category_id, label_ids).await?;
+        let label_ids =
+            validate_assignment(pool, metadata.category_id, &metadata.label_ids).await?;
         Self::update_medley_inner(
             pool,
             medley_id,
@@ -525,7 +527,7 @@ impl WishlistItem {
             name,
             member_id,
             is_admin,
-            Some((category_id, label_ids)),
+            Some((metadata.category_id, label_ids)),
         )
         .await?;
         Self::medley_metadata_assignment(pool, medley_id)
@@ -1109,17 +1111,17 @@ impl WishlistItem {
         member_id: Uuid,
         is_admin: bool,
         details: WishlistSongDetails<'_>,
-        category_id: Option<Uuid>,
-        label_ids: &[Uuid],
+        metadata: SongMetadataSelection,
     ) -> Result<Self, WishlistError> {
-        let label_ids = validate_assignment(pool, category_id, label_ids).await?;
+        let label_ids =
+            validate_assignment(pool, metadata.category_id, &metadata.label_ids).await?;
         Self::update_details_with_optional_metadata(
             pool,
             item_id,
             member_id,
             is_admin,
             details,
-            Some((category_id, label_ids)),
+            Some((metadata.category_id, label_ids)),
         )
         .await
     }
@@ -1655,8 +1657,10 @@ mod tests {
                 tempo: None,
                 musical_key: None,
             },
-            Some(category.id),
-            &[song_label.id, song_label.id],
+            SongMetadataSelection {
+                category_id: Some(category.id),
+                label_ids: vec![song_label.id, song_label.id],
+            },
         )
         .await
         .expect("song details and metadata should be updated together");
@@ -1679,8 +1683,10 @@ mod tests {
             "Updated metadata medley",
             member.id,
             true,
-            Some(category.clone().id),
-            &[medley_label.id],
+            SongMetadataSelection {
+                category_id: Some(category.clone().id),
+                label_ids: vec![medley_label.id],
+            },
         )
         .await
         .expect("medley details and metadata should be updated together");

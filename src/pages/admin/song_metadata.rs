@@ -103,8 +103,7 @@ fn SongMetadataLoaded(options: SongMetadataOptions) -> impl IntoView {
     let on_category_created = Callback::new(move |category: SongCategory| {
         categories.update(|categories| {
             categories.push(category);
-            categories
-                .sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+            categories.sort_by_cached_key(|category| category.name.to_lowercase());
         });
     });
     let on_category_updated = Callback::new(move |category: SongCategory| {
@@ -123,7 +122,7 @@ fn SongMetadataLoaded(options: SongMetadataOptions) -> impl IntoView {
     let on_label_created = Callback::new(move |label: SongLabel| {
         labels.update(|labels| {
             labels.push(label);
-            labels.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+            labels.sort_by_cached_key(|label| label.name.to_lowercase());
         });
     });
     let on_label_updated = Callback::new(move |label: SongLabel| {
