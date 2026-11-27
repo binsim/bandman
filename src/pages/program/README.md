@@ -8,6 +8,8 @@ Show the songs currently being played in rehearsal/performance. Each member uplo
 
 ## Planned behaviour
 
+- Split the program list by the shared wishlist categories, with an option to show
+  all items together.
 - Shared `program_state.current_song_id` (singleton or per rehearsal session)
 - Song change broadcasts over **WebSocket** so every connected client updates
 - Per-member PDF upload & viewer for the current song (`member_song_files`)

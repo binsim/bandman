@@ -1,9 +1,10 @@
-use super::WISHLIST_MUSICAL_KEYS;
+use super::metadata::SongMetadataFields;
+use crate::models::WISHLIST_MUSICAL_KEYS;
 #[cfg(feature = "ssr")]
 use crate::models::{WishlistCategory, WishlistSongDetails};
 use crate::{
     components::layout::PopupModal,
-    models::{Member, MemberRole, WishlistItem},
+    models::{Member, MemberRole, SongMetadataOptions, SongMetadataSelection, WishlistItem},
 };
 use leptos::prelude::*;
 use leptos_fluent::tr;
@@ -16,11 +17,46 @@ async fn wishlist_create(
     tempo: String,
     musical_key: String,
 ) -> Result<WishlistItem, ServerFnError> {
+    create_wishlist_item(title, artist, link, tempo, musical_key, None, Vec::new()).await
+}
+
+#[server(WishlistCreateWithMetadata, "/api")]
+async fn wishlist_create_with_metadata(
+    title: String,
+    artist: String,
+    link: String,
+    tempo: String,
+    musical_key: String,
+    category_id: Option<uuid::Uuid>,
+    label_ids: Option<Vec<uuid::Uuid>>,
+) -> Result<WishlistItem, ServerFnError> {
+    create_wishlist_item(
+        title,
+        artist,
+        link,
+        tempo,
+        musical_key,
+        category_id,
+        label_ids.unwrap_or_default(),
+    )
+    .await
+}
+
+#[cfg(feature = "ssr")]
+async fn create_wishlist_item(
+    title: String,
+    artist: String,
+    link: String,
+    tempo: String,
+    musical_key: String,
+    category_id: Option<uuid::Uuid>,
+    label_ids: Vec<uuid::Uuid>,
+) -> Result<WishlistItem, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::auth::session::require_member().await?;
     let link_title = resolve_link_title(&link).await;
     let tempo = parse_wishlist_tempo(&tempo)?;
-    WishlistItem::create_with_music_details(
+    WishlistItem::create_with_song_metadata(
         &pool,
         WishlistSongDetails {
             title: &title,
@@ -34,6 +70,8 @@ async fn wishlist_create(
         WishlistCategory::Song,
         member.id,
         &member.name,
+        category_id,
+        &label_ids,
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))
@@ -61,12 +99,13 @@ async fn wishlist_update(
     link: String,
     tempo: String,
     musical_key: String,
+    metadata: Option<SongMetadataSelection>,
 ) -> Result<WishlistItem, ServerFnError> {
     let pool = expect_context::<crate::state::AppState>().pool;
     let member = crate::auth::session::require_member().await?;
     let link_title = resolve_link_title(&link).await;
     let tempo = parse_wishlist_tempo(&tempo)?;
-    WishlistItem::update_details_with_music(
+    WishlistItem::update_details_with_song_metadata(
         &pool,
         item_id,
         member.id,
@@ -79,6 +118,7 @@ async fn wishlist_update(
             tempo,
             musical_key: Some(&musical_key),
         },
+        metadata.unwrap_or_default(),
     )
     .await
     .map_err(|error| ServerFnError::new(error.to_string()))
@@ -222,6 +262,7 @@ pub fn EditSong(
     let editing = RwSignal::new(false);
     let edit_pending = RwSignal::new(false);
     let confirm_delete = RwSignal::new(false);
+    let current_member = StoredValue::new(current_member);
 
     view! {
         <button
@@ -239,18 +280,20 @@ pub fn EditSong(
         >
             {move || if editing.get() { tr!("wishlist-close-edit") } else { tr!("wishlist-edit") }}
         </button>
-        <Show when= move || editing.get()>
-            <PopupModal clone:current_member data_testid="edit-song-form">
-                <EditSongForm edit_pending editing confirm_delete item current_member=current_member.clone() on_updated />
+        <Show when=move || editing.get() || confirm_delete.get()>
+            <PopupModal data_testid="edit-song-form">
+                <Show when=move || editing.get()>
+                    <EditSongForm edit_pending editing confirm_delete item current_member=current_member.get_value() on_updated />
+                </Show>
+                <Show when=move || confirm_delete.get()>
+                    <DeleteConfirmationForm
+                        item_id=item.get().id
+                        item_name = item.get().title
+                        confirm_delete
+                        on_deleted
+                    />
+                </Show>
             </PopupModal>
-        </Show>
-        <Show when=move || confirm_delete.get()>
-            <DeleteConfirmationForm
-                item_id=item.get().id
-                item_name = item.get().title
-                confirm_delete
-                on_deleted
-            />
         </Show>
     }.into_any()
 }
@@ -273,6 +316,13 @@ pub fn EditSongForm(
     let link = RwSignal::new(item.get().link.clone().unwrap_or_default());
     let tempo = RwSignal::new(item.get().tempo.map(|i| i.to_string()).unwrap_or_default());
     let musical_key = RwSignal::new(item.get().musical_key.clone().unwrap_or_default());
+    let category_id = RwSignal::new(
+        item.get()
+            .song_category
+            .as_ref()
+            .map(|category| category.id),
+    );
+    let label_ids = RwSignal::new(item.get().labels.iter().map(|label| label.id).collect());
 
     let error = RwSignal::new(Option::<String>::None);
 
@@ -289,23 +339,23 @@ pub fn EditSongForm(
                 link.get(),
                 tempo.get(),
                 musical_key.get(),
+                Some(SongMetadataSelection {
+                    category_id: category_id.get(),
+                    label_ids: label_ids.get(),
+                }),
             )
             .await
             {
-                Ok(updated) => {
+                Ok(mut updated) => {
+                    let existing = item.get_untracked();
+                    updated.medley_category = existing.medley_category;
+                    updated.medley_labels = existing.medley_labels;
                     title.set(updated.title.clone());
                     artist.set(updated.artist.clone().unwrap_or_default());
                     link.set(updated.link.clone().unwrap_or_default());
                     tempo.set(updated.tempo.map(|i| i.to_string()).unwrap_or_default());
                     musical_key.set(updated.musical_key.clone().unwrap_or_default());
-                    item.update(|item| {
-                        item.title = updated.title.clone();
-                        item.artist = updated.artist.clone();
-                        item.link = updated.link.clone();
-                        item.link_title = updated.link_title.clone();
-                        item.tempo = updated.tempo;
-                        item.musical_key = updated.musical_key.clone();
-                    });
+                    item.set(updated.clone());
                     on_updated.run(updated);
                     edit_pending.set(false);
                     editing.set(false);
@@ -321,6 +371,13 @@ pub fn EditSongForm(
         link.set(item.get().link.clone().unwrap_or_default());
         tempo.set(item.get().tempo.map(|i| i.to_string()).unwrap_or_default());
         musical_key.set(item.get().musical_key.clone().unwrap_or_default());
+        category_id.set(
+            item.get()
+                .song_category
+                .as_ref()
+                .map(|category| category.id),
+        );
+        label_ids.set(item.get().labels.iter().map(|label| label.id).collect());
         error.set(None);
         editing.set(false);
     });
@@ -334,7 +391,7 @@ pub fn EditSongForm(
                 disabled=move || edit_pending.get()
             ></button>
             <form
-                class="wishlist-edit-form"
+                class="wishlist-edit-form popup-modal-panel"
                 role="dialog"
                 aria-modal="true"
                 aria-label=move || tr!("wishlist-edit")
@@ -346,6 +403,14 @@ pub fn EditSongForm(
                 }
             >
                 <WishlistSongFields title artist link tempo musical_key/>
+                <details class="wishlist-metadata-editor" data-testid="wishlist-metadata-details">
+                    <summary>{move || tr!("wishlist-metadata-edit")}</summary>
+                    <SongMetadataFields
+                        category_id
+                        label_ids
+                        disabled=Signal::derive(move || edit_pending.get())
+                    />
+                </details>
                 <div class="form-actions">
                     <button class="btn btn-primary btn-sm" type="submit" data-testid="wishlist-save-edit" disabled=move || edit_pending.get()>
                         {move || if edit_pending.get() { tr!("wishlist-edit-saving") } else { tr!("wishlist-save-edit") }}
@@ -459,7 +524,26 @@ pub fn CreateSong(
     let link = RwSignal::new(String::new());
     let tempo = RwSignal::new(String::new());
     let musical_key = RwSignal::new(String::new());
+    let category_id = RwSignal::new(Option::<uuid::Uuid>::None);
+    let label_ids = RwSignal::new(Vec::<uuid::Uuid>::new());
+    let metadata_open = RwSignal::new(false);
+    let metadata_options = expect_context::<RwSignal<SongMetadataOptions>>();
+    let has_metadata_options = Memo::new(move |_| {
+        let options = metadata_options.get();
+        !options.categories.is_empty() || !options.labels.is_empty()
+    });
+    let selected_metadata_count =
+        Memo::new(move |_| usize::from(category_id.get().is_some()) + label_ids.get().len());
     let pending = RwSignal::new(false);
+    let metadata_escape_listener = window_event_listener(
+        leptos::ev::keydown,
+        move |event: leptos::ev::KeyboardEvent| {
+            if event.key() == "Escape" && metadata_open.get() && !pending.get() {
+                metadata_open.set(false);
+            }
+        },
+    );
+    on_cleanup(move || metadata_escape_listener.remove());
     let error = RwSignal::new(Option::<String>::None);
     let matching_title = Memo::new(move |_| has_matching_title(title, artist, items));
 
@@ -473,16 +557,20 @@ pub fn CreateSong(
         let link_value = link.get().trim().to_string();
         let tempo_value = tempo.get();
         let musical_key_value = musical_key.get();
+        let category_id_value = category_id.get();
+        let label_ids_value = label_ids.get();
 
         pending.set(true);
         error.set(None);
         leptos::task::spawn_local(async move {
-            match wishlist_create(
+            match wishlist_create_with_metadata(
                 title_value,
                 artist_value,
                 link_value,
                 tempo_value,
                 musical_key_value,
+                category_id_value,
+                Some(label_ids_value),
             )
             .await
             {
@@ -492,6 +580,9 @@ pub fn CreateSong(
                     link.set(String::new());
                     tempo.set(String::new());
                     musical_key.set(String::new());
+                    category_id.set(None);
+                    label_ids.set(Vec::new());
+                    metadata_open.set(false);
                     on_created.run(item);
                 }
                 Err(message) => error.set(Some(message.to_string())),
@@ -501,7 +592,7 @@ pub fn CreateSong(
     };
 
     view! {
-        <section class="card">
+        <section class="card wishlist-create">
             <header>
                 <h2>{move || tr!("wishlist-add-title")}</h2>
             </header>
@@ -526,6 +617,27 @@ pub fn CreateSong(
                 </Show>
 
                 <div class="form-actions">
+                    <Show when=move || has_metadata_options.get()>
+                        <button
+                            class="btn btn-ghost btn-sm"
+                            type="button"
+                            aria-haspopup="dialog"
+                            aria-expanded=move || metadata_open.get().to_string()
+                            on:click=move |_| metadata_open.set(true)
+                            disabled=move || pending.get()
+                            data-testid="wishlist-create-metadata-open"
+                        >
+                            {move || {
+                                let title = tr!("wishlist-metadata-edit");
+                                let count = selected_metadata_count.get();
+                                if count == 0 {
+                                    title
+                                } else {
+                                    format!("{title} ({count})")
+                                }
+                            }}
+                        </button>
+                    </Show>
                     <button
                         class="btn btn-primary"
                         type="submit"
@@ -544,6 +656,56 @@ pub fn CreateSong(
                 <p class="form-error" role="alert" data-testid="wishlist-create-error">
                     {move || error.get().unwrap_or_default()}
                 </p>
+            </Show>
+            <Show when=move || metadata_open.get() && has_metadata_options.get()>
+                <button
+                    class="wishlist-metadata-backdrop"
+                    type="button"
+                    aria-label=move || tr!("wishlist-metadata-close")
+                    on:click=move |_| metadata_open.set(false)
+                    disabled=move || pending.get()
+                    data-testid="wishlist-create-metadata-backdrop"
+                ></button>
+                <PopupModal data_testid="wishlist-create-metadata-popup">
+                    <section
+                        class="wishlist-metadata-dialog popup-modal-panel"
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="wishlist-create-metadata-title"
+                        data-testid="wishlist-create-metadata-dialog"
+                    >
+                        <header class="wishlist-metadata-dialog-header">
+                            <h2 id="wishlist-create-metadata-title">
+                                {move || tr!("wishlist-metadata-edit")}
+                            </h2>
+                            <button
+                                class="btn btn-ghost btn-sm"
+                                type="button"
+                                aria-label=move || tr!("wishlist-metadata-close")
+                                on:click=move |_| metadata_open.set(false)
+                                disabled=move || pending.get()
+                            >
+                                "×"
+                            </button>
+                        </header>
+                        <SongMetadataFields
+                            category_id
+                            label_ids
+                            disabled=Signal::derive(move || pending.get())
+                        />
+                        <div class="form-actions">
+                            <button
+                                class="btn btn-primary btn-sm"
+                                type="button"
+                                on:click=move |_| metadata_open.set(false)
+                                disabled=move || pending.get()
+                                data-testid="wishlist-create-metadata-done"
+                            >
+                                {move || tr!("wishlist-metadata-done")}
+                            </button>
+                        </div>
+                    </section>
+                </PopupModal>
             </Show>
         </section>
     }

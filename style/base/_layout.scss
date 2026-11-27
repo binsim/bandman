@@ -266,16 +266,23 @@ body > header nav ul {
 
 .popup-modal {
   position: fixed;
-  top: 50%;
-  left: 50%;
+  inset: 0;
   z-index: 31;
+  display: grid;
+  place-items: center;
+  padding: var(--space-2);
+  pointer-events: none;
+}
+
+.popup-modal-panel {
+  box-sizing: border-box;
   width: min(42rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
   max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
   padding: var(--space-4);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface-raised);
   box-shadow: var(--shadow-card);
-  transform: translate(-50%, -50%);
+  pointer-events: auto;
 }
